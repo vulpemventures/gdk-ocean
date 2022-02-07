@@ -16,3 +16,21 @@ python gdk-ocean.py
 ## CLI
 
 You can communicate with gdk-ocean using the `cli.py` script. 
+
+## Development
+
+Create virtual env (need Python 3.9 installed)
+```
+make env
+```
+
+Then, activate the env and install the dependencies.
+```
+source venv/bin/activate
+make deps
+```
+
+Run the gdk-ocean instance
+```
+make run
+```
