@@ -17,7 +17,7 @@ python gdk-ocean.py
 
 You can communicate with gdk-ocean using the `cli.py` script. 
 
-## Development
+### Development
 
 Create virtual env (need Python 3.9 installed)
 ```
