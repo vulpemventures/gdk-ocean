@@ -10,7 +10,7 @@ The current version of gdk-ocean uses Python 3.9, see `requirements.txt` for dep
 
 Run the server in any Python 3.9 environmnent:
 ```
-python gdk-ocean.py
+make run
 ```
 
 ## CLI
