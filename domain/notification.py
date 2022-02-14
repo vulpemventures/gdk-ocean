@@ -81,8 +81,8 @@ class TxNotification(BaseNotification):
         else:
             raise Exception(f"Unknown tx event type: {self.type}")
     
-    def _get_block_details(self) -> notification_pb2.BlockDetails:
-        return notification_pb2.BlockDetails(
+    def _get_block_details(self) -> types_pb2.BlockDetails:
+        return types_pb2.BlockDetails(
             hash=bytes.fromhex(self.data["block_hash"]),
             height=self.data["block_height"],
             timestamp=0,
