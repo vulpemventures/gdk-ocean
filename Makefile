@@ -1,6 +1,6 @@
 stubs:
 	rm -rf ocean
-	cp -r specs/ocean/gen/python/ocean ocean
+	cp -r specs/api-spec/protobuf/gen/python/ocean ocean
 
 env:
 	python3.9 -m venv venv

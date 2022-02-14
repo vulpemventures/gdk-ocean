@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import grpc
+import argparse
 from handlers.grpc_account import GrpcAccountServicer
 from handlers.grpc_notifications import GrpcNotificationsServicer
 from handlers.grpc_transaction import GrpcTransactionServicer
@@ -15,6 +16,13 @@ from ocean.v1alpha import wallet_pb2_grpc, notification_pb2_grpc, transaction_pb
 import greenaddress as gdk
 
 async def main():
+    parser = argparse.ArgumentParser(description='Ocean gRPC server')
+    parser.add_argument('--port', type=int, default=50051, help='gRPC port')
+    parser.add_argument('--datadir', type=str, default='data', help='private data directory')
+    
+    args = parser.parse_args()
+    address = 'localhost:%d' % args.port
+    
     wallet_service = WalletService()
     transaction_service = TransactionService(wallet_service)
     notifications_service = NotificationsService(wallet_service)
@@ -24,7 +32,6 @@ async def main():
     
     # start the grpc server
     server = grpc.aio.server()
-    address = 'localhost:50051'
     server.add_insecure_port(address)
     
     wallet_servicer = GrpcWalletServicer(wallet_service)
@@ -55,7 +62,7 @@ async def main():
         
     
 if __name__ == "__main__":
-    gdk.init({})
+    gdk.init()
     
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
