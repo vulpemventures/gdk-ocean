@@ -1,6 +1,6 @@
 import logging
 from domain.receiver import Receiver
-from domain.utxo import to_grpc_utxo
+from domain.utxo import make_utxos_list_proto
 from services.transaction import TransactionService
 from ocean.v1alpha import transaction_pb2, transaction_pb2_grpc
 
@@ -8,12 +8,16 @@ class GrpcTransactionServicer(transaction_pb2_grpc.TransactionServiceServicer):
     def __init__(self, transactionService: TransactionService):
         self._svc = transactionService
     
+    def GetTransaction(self, request: transaction_pb2.GetTransactionRequest, _) -> transaction_pb2.GetTransactionResponse:
+        tx_hex, block_details = self._svc.get_transaction(request.txid)
+        return transaction_pb2.GetTransactionResponse(tx_hex=tx_hex, block_details=block_details.to_proto())
+    
     def SelectUtxos(self, request: transaction_pb2.SelectUtxosRequest, _) -> transaction_pb2.SelectUtxosResponse:
         coinselection = self._svc.select_utxos(request.account_key.name, request.target_asset, request.target_amount)
-        utxos = map(lambda utxo: to_grpc_utxo(utxo), coinselection['utxos'])
+        selected_utxos = [utxo.to_proto() for utxo in coinselection['utxos']]
         logging.debug(f"Selected UTXOs: {coinselection}")
         return transaction_pb2.SelectUtxosResponse(
-            utxos=utxos,
+            utxos=make_utxos_list_proto(request.account_key.name, selected_utxos),
             change=coinselection['change'],
         )
     

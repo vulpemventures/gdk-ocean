@@ -60,7 +60,7 @@ def genseed(ctx: click.Context):
 def create(ctx: click.Context, mnemonic: str, password: str):
     request = wallet_pb2.CreateWalletRequest()
     request.mnemonic = mnemonic
-    request.password = password.encode('utf-8')
+    request.password = password
     
     wallet_stub = _get_wallet_stub_from_context(ctx)
     response = wallet_stub.CreateWallet(request)
@@ -72,7 +72,7 @@ def create(ctx: click.Context, mnemonic: str, password: str):
 @click.pass_context
 def unlock(ctx: click.Context, password: str):
     request = wallet_pb2.UnlockRequest()
-    request.password = password.encode('utf-8')
+    request.password = password
     wallet_stub = _get_wallet_stub_from_context(ctx)
     response = wallet_stub.Unlock(request)
     logging.info(response)
@@ -194,6 +194,15 @@ def watchtxs(ctx: click.Context):
     notification_stub = _get_notification_stub_from_context(ctx)
     for notification in notification_stub.TransactionNotifications(request):
         logging.info(notification)
+
+@cli.command()
+@click.option('--txid', '-t', default=None)
+@click.pass_context
+def gettransaction(ctx: click.Context, txid: str):
+    request = transaction_pb2.GetTransactionRequest(txid=txid)
+    transaction_stub = _get_transaction_stub_from_context(ctx)
+    response = transaction_stub.GetTransaction(request)
+    logging.info(response)
 
 if __name__ == '__main__':
     cli(obj={})

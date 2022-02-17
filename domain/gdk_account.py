@@ -61,8 +61,7 @@ class GdkAccount():
         selected_utxos: List[Utxo] = []
         for utxo in all_utxos_for_asset:
             selected_utxos.append(utxo)
-            total += utxo['value']
-            
+            total += utxo.value
             if total >= amount:
                 break
         

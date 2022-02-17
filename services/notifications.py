@@ -107,27 +107,24 @@ class NotificationsService():
     async def _handle_gdk_notifications(self, wallet: GdkWallet) -> None:
         """async worker waiting for new GDK block notification and then process Ocean notifications
         returns TX_CONFIRMED, UTXO_SPENT, UTXO_UNSPECIFIED (add) via the queue argument"""
-        gdk_notifications = wallet.session.notifications
-
+        
         async def next_notification():
             while True:
                 try:
-                    return gdk_notifications.get(block=False)
+                    return wallet.session.notifications.get(False)
                 except:
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(10)
 
         while self._started:
             notification = await next_notification()
             event = notification['event']
-            
+
             if event == 'block':
                 logging.debug(f"new block: {notification['block']['block_height']} {notification['block']['block_hash']}")
                 block = _BlockNotification(notification['block'])
                 # compute notifications from new state each time we get a block
                 await self._put_utxos_notifications()
                 await self._put_confirmed_txs_notifications(block['block_height'], block['block_hash'])
-
-            await asyncio.sleep(1)
         
     async def _handle_locker_notifications(self, wallet: GdkWallet) -> None:
         locker_notifications_queue = wallet.locker.notifications_queue

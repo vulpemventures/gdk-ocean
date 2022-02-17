@@ -1,27 +1,29 @@
 import logging
-from typing import Dict
+from typing import Dict, Tuple, TypedDict
 import json
+import http.client
 import greenaddress as gdk
+from domain.block_details import BlockDetails
 from domain.gdk_utils import make_session, gdk_resolve
 from domain.gdk_account import GdkAccount
 from domain.locker import Locker
 
 class GdkWallet:
-    def __init__(self):
+    def __init__(self, net: str):
         self.AMP_ACCOUNT_TYPE = '2of2_no_recovery'
         self.PIN_DATA_FILENAME = 'pin_data.json'
 
-        self.session: gdk.Session = None
         self.last_block_height = 0
         self.accounts: Dict[str, GdkAccount] = {}
         self.locker: Locker = None
+        self.network = net
+        self.session = make_session(self.network)
         
     @classmethod
     async def create_new_wallet(cls, mnemonic: str, pin: str, network: str):
         """Class method to create and return an instance of gdk_wallet"""
-        self = cls()
+        self = cls(network)
         self.locker = await Locker.create()
-        self.session = make_session(network)
         self.session.register_user({}, mnemonic).resolve()
         self.session.login_user({}, {'mnemonic': mnemonic, 'password': ""}).resolve()
         self.set_pin(mnemonic, pin)
@@ -31,10 +33,9 @@ class GdkWallet:
     @classmethod
     async def login_with_pin(cls, pin: str, network: str):
         """Class method to create and return an instance of gdk_wallet"""
-        self = cls()
+        self = cls(network)
         self.locker = await Locker.create()
         pin_data = json.loads(open(self.PIN_DATA_FILENAME).read())
-        self.session = make_session(network)
         self.session.login_user({}, {'pin': pin, 'pin_data': pin_data}).resolve()
         self._get_existing_subaccounts()
         logging.debug('Logged in')
@@ -47,7 +48,7 @@ class GdkWallet:
             self.accounts[account['name']] = GdkAccount(self.session, account['name'], self.locker)
 
     def is_logged_in(self) -> bool:
-        return self.session is not None and self.session.session_obj is not None 
+        return self.session is not None
 
     def set_pin(self, mnemonic, pin):
         pin_data = gdk.set_pin(self.session.session_obj, mnemonic, str(pin), str('device_id_1'))
@@ -77,3 +78,41 @@ class GdkWallet:
         self.accounts[account_key] = new_account
         return new_account
         
+        
+    def get_transaction_hex(self, txid: str) -> str:
+        """get the transaction as hex string, the transaction must be associated with wallet"""
+        details = self.session.get_transaction_details(txid)
+        return details["transaction"]
+
+    def _get_esplora_url(self) -> Tuple[str, str]:
+        """returns the esplora host and base url (depends on network)"""
+        blockstream_host = 'blockstream.info'
+        base = '/{}/api'
+
+        if self.network == 'testnet-liquid':
+            return blockstream_host, base.format('liquidtestnet')
+
+        if self.network == 'liquid':
+            return blockstream_host, base.format('liquid')
+
+        raise Exception("Unable to find base esplora url for network {}".format(self.network))
+    
+    def _get_tx_status(self, txid: str) -> Dict:
+        host, base_url = self._get_esplora_url()
+        conn = http.client.HTTPSConnection(host)
+        conn.request('GET', '{}/tx/{}/status'.format(base_url, txid))
+        response = conn.getresponse()
+        
+        if response.status != 200:
+            raise Exception("Error getting transaction status: {} {}".format(response.status, response.reason))
+
+        return json.loads(response.read())
+       
+    def get_block_details(self, txid: str) -> BlockDetails:
+        tx_status = self._get_tx_status(txid)
+        
+        if not tx_status["confirmed"]:
+            raise Exception("Transaction not confirmed, impossible to fetch block details")
+
+        return BlockDetails(tx_status["block_hash"], tx_status["block_height"], tx_status["block_time"])
+    

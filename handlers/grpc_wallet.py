@@ -12,7 +12,7 @@ class GrpcWalletServicer(wallet_pb2_grpc.WalletServiceServicer):
         return response
     
     async def CreateWallet(self, request: wallet_pb2.CreateWalletRequest, _):
-        await self._svc.create_wallet(request.mnemonic, request.password, "testnet-liquid")
+        await self._svc.create_wallet(request.mnemonic, request.password)
         return wallet_pb2.CreateWalletResponse()
     
     async def Unlock(self, request: wallet_pb2.UnlockRequest, _):

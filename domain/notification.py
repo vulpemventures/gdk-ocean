@@ -1,5 +1,5 @@
 from ocean.v1alpha import notification_pb2, types_pb2
-from domain.utxo import Utxo, to_grpc_utxo
+from domain.utxo import Utxo
 from enum import Enum
 
 class NotificationType(Enum):
@@ -40,7 +40,7 @@ class UtxoNotification(BaseNotification):
     
     def to_proto(self) :
         account_key = types_pb2.AccountKey(id=0, name=self.account_name)
-        utxo_proto = to_grpc_utxo(self.data)
+        utxo_proto = self.data.to_proto()
         utxo_with_event = types_pb2.UtxoWithEvent(account_key=account_key, utxo=utxo_proto, event_type=self._type_to_tx_event_type())
         return notification_pb2.UtxosNotificationsResponse(utxos=[utxo_with_event])
     

@@ -1,8 +1,10 @@
 import logging
-from typing import List
+from typing import List, Tuple
+from domain import block_details
 from domain.receiver import Receiver
 from domain.utxo import CoinSelectionResult
 import greenaddress as gdk
+from ocean.v1alpha.types_pb2 import BlockDetails
 from services.wallet import WalletService
 
 class TransactionService:
@@ -38,3 +40,10 @@ class TransactionService:
         wallet = self._wallet_svc.get_wallet()
         fees = wallet.session.get_fee_estimates()["fees"]
         return fees[1] # 1 block confirmation, 0 is min-relay-fees
+
+    def get_transaction(self, txid: str) -> Tuple[str, BlockDetails]:
+        wallet = self._wallet_svc.get_wallet()
+        wallet._get_tx_status(txid)
+        tx_hex = wallet.get_transaction_hex(txid)
+        block_details = wallet.get_block_details(txid)
+        return tx_hex, block_details

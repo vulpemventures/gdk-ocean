@@ -1,5 +1,5 @@
 from ast import Dict
-from domain.utxo import to_grpc_utxo
+from domain.utxo import make_utxos_list_proto
 from services.account import AccountService
 from ocean.v1alpha import account_pb2, account_pb2_grpc, types_pb2
 
@@ -44,23 +44,12 @@ class GrpcAccountServicer(account_pb2_grpc.AccountServiceServicer):
         spendable = [utxo for utxo in utxos if not utxo['is_locked']]
         locked = [utxo for utxo in utxos if utxo['is_locked']]
         
-        account_k = types_pb2.AccountKey()
-        account_k.id = 0
-        account_k.name = request.account_key.name
-        
-        spendable_utxos_msg = types_pb2.Utxos(
-            account_key=account_k,
-            utxos=map(lambda utxo: to_grpc_utxo(utxo), spendable)
-        )
-        
-        locked_utxos_msg = types_pb2.Utxos(
-            account_key=account_k,
-            utxos=map(lambda utxo: to_grpc_utxo(utxo), locked)
-        )
+        spendable_utxos_msg = make_utxos_list_proto(request.account_key.name, spendable)
+        locked_utxos_msg = make_utxos_list_proto(request.account_key.name, locked)
         
         response = account_pb2.ListUtxosResponse(
-            spendable_utxos=[spendable_utxos_msg],
-            locked_utxos=[locked_utxos_msg]
+            spendable_utxos=spendable_utxos_msg,
+            locked_utxos=locked_utxos_msg
         )
         return response
         

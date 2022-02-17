@@ -15,19 +15,24 @@ from signal import SIGINT, SIGTERM
 from ocean.v1alpha import wallet_pb2_grpc, notification_pb2_grpc, transaction_pb2_grpc, account_pb2_grpc
 import greenaddress as gdk
 
+# NETWORK = "liquid"
+NETWORK = "testnet-liquid"
+
 async def main():
     parser = argparse.ArgumentParser(description='Ocean gRPC server')
     parser.add_argument('--port', type=int, default=50051, help='gRPC port')
-    parser.add_argument('--datadir', type=str, default='data', help='private data directory')
-    
     args = parser.parse_args()
+
+    # init GDK config
+    gdk.init({})
+    
     address = 'localhost:%d' % args.port
     
-    wallet_service = WalletService()
+    wallet_service = WalletService(NETWORK)
     transaction_service = TransactionService(wallet_service)
     notifications_service = NotificationsService(wallet_service)
     account_service = AccountService(wallet_service)
-    
+
     logging.basicConfig(level=logging.DEBUG)
     
     # start the grpc server
@@ -62,7 +67,6 @@ async def main():
         
     
 if __name__ == "__main__":
-    gdk.init({})
     
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
