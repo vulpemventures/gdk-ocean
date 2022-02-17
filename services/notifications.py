@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from time import time
 from typing import Dict, Set, TypedDict, List
 from domain.gdk_wallet import GdkWallet
 from domain.notification import BaseNotification, TxConfirmedNotification, UtxoSpentNotification, UtxoUnspecifiedNotification
@@ -44,11 +45,6 @@ def _diff_utxos_list(current: Dict[str, List[Utxo]], new: Dict[str, List[Utxo]],
     
     return notifs
 
-class _BlockNotification(TypedDict):
-    """this is not an Ocean notification! it represents the GDK block notification dict"""
-    block_hash: str
-    block_height: int
-
 class NotificationsService():
     def __init__(self, wallet_svc: WalletService):
         self._wallet_svc = wallet_svc
@@ -58,6 +54,7 @@ class NotificationsService():
         
         # the accounts to compute diff from
         self._utxos_check_accounts: Set[str] = set()
+        self._chaintip: int = None
 
         # init the state
         try:
@@ -65,6 +62,20 @@ class NotificationsService():
             self._utxos_by_account = _get_utxos_by_account(wallet)
         except:
             self._utxos_by_account = {}    
+    
+    def _get_last_block_height(self) -> int:
+        """return the last block height"""
+        wallet = self._wallet_svc.get_wallet()
+        while True:
+            notification = wallet.session.notifications.get(block=True, timeout=None)
+            if notification['event'] == 'block':
+                return notification['block']['block_height']
+    
+    def _get_chain_tip(self) -> int:
+        if not self._chaintip:
+            self._chaintip = self._get_last_block_height()
+            
+        return self._chaintip
     
     async def _put_in_queue(self, notification: BaseNotification) -> None:
         logging.debug("new notification {} put in queue".format(notification.type))
@@ -81,18 +92,25 @@ class NotificationsService():
         # update the cache with the new state
         self._utxos_by_account = new_utxos_by_account
     
-    async def _put_confirmed_txs_notifications(self, height: int, block_hash: str) -> None:
+    async def _put_confirmed_txs_notifications(self) -> None:
         wallet = self._wallet_svc.get_wallet()
-        all_accounts_names = list(wallet.accounts.keys())
-        for account_name in all_accounts_names:
+        notifications: List[TxConfirmedNotification] = []
+        
+        for account_name in list(wallet.accounts.keys()):
             try:
                 account = wallet.get_account(account_name)
-                txs_for_height = account.get_transactions(height)
-                tx_confirmed_notifications = [TxConfirmedNotification(tx['txhash'], block_hash, height) for tx in txs_for_height] 
-                for notif in tx_confirmed_notifications:
-                    await self._put_in_queue(notif)
-            except:
+                txs_for_height = account.get_transactions(self._get_chain_tip())
+                notifications = notifications + [TxConfirmedNotification(tx['txhash'], wallet.get_block_details(tx['txhash']), account_name) for tx in txs_for_height] 
+            except Exception as e:
+                logging.exception(e)
                 continue
+
+        for notif in notifications:
+            if notif.block_details.block_height > self._get_chain_tip():
+                self._chaintip = notif.block_details.block_height
+                
+            await self._put_in_queue(notif)
+
     
     async def _wait_for_wallet(self) -> GdkWallet:
         """this let to wait for the wallet is ready (either unlocked or created if not exist)"""
@@ -104,29 +122,20 @@ class NotificationsService():
                 await asyncio.sleep(2)
         return wallet
 
-    async def _handle_gdk_notifications(self, wallet: GdkWallet) -> None:
+    async def _handle_gdk_notifications(self) -> None:
         """async worker waiting for new GDK block notification and then process Ocean notifications
         returns TX_CONFIRMED, UTXO_SPENT, UTXO_UNSPECIFIED (add) via the queue argument"""
         
-        async def next_notification():
-            while True:
-                try:
-                    return wallet.session.notifications.get(False)
-                except:
-                    await asyncio.sleep(10)
-
+        # every 30 seconds, try to get new notifications from wallet state
         while self._started:
-            notification = await next_notification()
-            event = notification['event']
-
-            if event == 'block':
-                logging.debug(f"new block: {notification['block']['block_height']} {notification['block']['block_hash']}")
-                block = _BlockNotification(notification['block'])
-                # compute notifications from new state each time we get a block
-                await self._put_utxos_notifications()
-                await self._put_confirmed_txs_notifications(block['block_height'], block['block_hash'])
+            await asyncio.gather(
+                self._put_utxos_notifications(), 
+                self._put_confirmed_txs_notifications()
+            )
+            await asyncio.sleep(30)
         
-    async def _handle_locker_notifications(self, wallet: GdkWallet) -> None:
+    async def _handle_locker_notifications(self) -> None:
+        wallet = self._wallet_svc.get_wallet()
         locker_notifications_queue = wallet.locker.notifications_queue
         while True:
             n = await locker_notifications_queue.get()
@@ -144,14 +153,13 @@ class NotificationsService():
     
     async def start(self) -> None:
         self._check_not_started()
+
+        # wait for the wallet to be ready (either unlocked or created if not exist)
+        await self._wait_for_wallet()
         self._started = True
-        wallet = await self._wait_for_wallet()
         
         await asyncio.gather(
-            self._handle_gdk_notifications(wallet), 
-            self._handle_locker_notifications(wallet)
+            self._handle_gdk_notifications(), 
+            self._handle_locker_notifications()
         )
     
-    def stop(self):
-        self._started = False
-        

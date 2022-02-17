@@ -1,6 +1,7 @@
 import logging
 import click
 import grpc
+from domain.account_key import AccountKey
 from ocean.v1alpha import wallet_pb2_grpc, wallet_pb2, account_pb2_grpc, account_pb2, types_pb2, transaction_pb2_grpc, transaction_pb2, notification_pb2, notification_pb2_grpc
 
 def _get_wallet_stub_from_context(ctx: click.Context) -> wallet_pb2_grpc.WalletServiceStub:
@@ -90,9 +91,7 @@ def createaccount(ctx: click.Context, name: str):
 @click.option('--account', '-a', default=None)
 @click.pass_context
 def getnewaddress(ctx: click.Context, account: str):
-    account_k = types_pb2.AccountKey()
-    account_k.id = 0
-    account_k.name = account
+    account_k = AccountKey.from_name(account).to_proto()
     request = account_pb2.DeriveAddressRequest(account_key=account_k)
     request.num_of_addresses = 1
     
@@ -105,9 +104,7 @@ def getnewaddress(ctx: click.Context, account: str):
 @click.option('--account', '-a', default=None)
 @click.pass_context
 def listaddresses(ctx: click.Context, account: str):
-    account_k = types_pb2.AccountKey()
-    account_k.id = 0
-    account_k.name = account
+    account_k = AccountKey.from_name(account).to_proto()
     request = account_pb2.ListAddressesRequest(account_key=account_k)
     
     account_stub = _get_account_stub_from_context(ctx)
@@ -119,9 +116,7 @@ def listaddresses(ctx: click.Context, account: str):
 @click.option('--account', '-a', default=None)
 @click.pass_context
 def balance(ctx: click.Context, account: str):
-    account_k = types_pb2.AccountKey()
-    account_k.id = 0
-    account_k.name = account
+    account_k = AccountKey.from_name(account).to_proto()
     request = account_pb2.BalanceRequest(account_key=account_k)
     account_stub = _get_account_stub_from_context(ctx)
     response = account_stub.Balance(request)
@@ -131,9 +126,7 @@ def balance(ctx: click.Context, account: str):
 @click.option('--account', '-a', default=None)
 @click.pass_context
 def listutxos(ctx: click.Context, account: str):
-    account_k = types_pb2.AccountKey()
-    account_k.id = 0
-    account_k.name = account
+    account_k = AccountKey.from_name(account).to_proto()
     request = account_pb2.ListUtxosRequest(account_key=account_k)
     account_stub = _get_account_stub_from_context(ctx)
     response = account_stub.ListUtxos(request)
@@ -154,9 +147,7 @@ def fees(ctx: click.Context):
 @click.option('--asset', '-ass', default=None)
 @click.pass_context
 def transfer(ctx: click.Context, account: str, to: str, sats: str, asset: str):
-    account_k = types_pb2.AccountKey()
-    account_k.id = 0
-    account_k.name = account
+    account_k = AccountKey.from_name(account).to_proto()
     out = types_pb2.Output()
     out.asset = asset
     out.amount = int(sats)
@@ -173,7 +164,8 @@ def transfer(ctx: click.Context, account: str, to: str, sats: str, asset: str):
 @click.option('--asset', '-ass', default=None)
 @click.pass_context
 def selectutxos(ctx: click.Context, account: str, sats: str, asset: str):
-    request = transaction_pb2.SelectUtxosRequest(account_key=types_pb2.AccountKey(id=0, name=account), target_amount=int(sats), target_asset=asset, strategy=0)
+    account_k = AccountKey.from_name(account).to_proto()
+    request = transaction_pb2.SelectUtxosRequest(account_key=account_k, target_amount=int(sats), target_asset=asset, strategy=0)
     transaction_stub = _get_transaction_stub_from_context(ctx)
     response = transaction_stub.SelectUtxos(request)
     logging.info(response)
@@ -182,7 +174,8 @@ def selectutxos(ctx: click.Context, account: str, sats: str, asset: str):
 @click.option('--account', '-a', default=None)
 @click.pass_context
 def watchutxos(ctx: click.Context, account: str):
-    request = notification_pb2.UtxosNotificationsRequest(account_key=types_pb2.AccountKey(id=0, name=account))
+    account_k = AccountKey.from_name(account).to_proto()
+    request = notification_pb2.UtxosNotificationsRequest(account_key=account_k)
     notification_stub = _get_notification_stub_from_context(ctx)
     for notification in notification_stub.UtxosNotifications(request):
         logging.info(notification)

@@ -1,5 +1,4 @@
 import asyncio
-from cmath import log
 import logging
 from typing import Dict, List
 from domain.notification import BaseNotification, NotificationType
@@ -85,7 +84,7 @@ class GrpcNotificationsServicer(notification_pb2_grpc.NotificationServiceService
 
         try:
             while True:
-                notification = await asyncio.create_task(self._subscribers[id_subscriber].get())
+                notification = await self._subscribers[id_subscriber].get()
                 proto_msg = notification.to_proto()
                 yield proto_msg
         finally:
