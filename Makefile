@@ -10,3 +10,6 @@ deps:
 
 run:
 	python gdk-ocean.py
+
+test:
+	pytest -s 

@@ -2,6 +2,7 @@ import asyncio
 import logging
 import grpc
 import argparse
+from domain.pin_data_repository import FilePinDataRepository
 from handlers.grpc_account import GrpcAccountServicer
 from handlers.grpc_notifications import GrpcNotificationsServicer
 from handlers.grpc_transaction import GrpcTransactionServicer
@@ -21,6 +22,8 @@ NETWORK = "testnet-liquid"
 async def main():
     parser = argparse.ArgumentParser(description='Ocean gRPC server')
     parser.add_argument('--port', type=int, default=50051, help='gRPC port')
+    parser.add_argument('--pin_data_path', type=str, default='./pin_data.json', help='path to encrypted pin data file')
+    
     args = parser.parse_args()
 
     # init GDK config
@@ -28,7 +31,10 @@ async def main():
     
     address = 'localhost:%d' % args.port
     
-    wallet_service = WalletService(NETWORK)
+    # create the file store for the pin_data
+    pin_data_repo = FilePinDataRepository(args.pin_data_path)
+    
+    wallet_service = WalletService(pin_data_repo, NETWORK)
     transaction_service = TransactionService(wallet_service)
     notifications_service = NotificationsService(wallet_service)
     account_service = AccountService(wallet_service)

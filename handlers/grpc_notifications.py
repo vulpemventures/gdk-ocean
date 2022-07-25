@@ -7,7 +7,7 @@ from services.notifications import NotificationsService
 
 class _Subscriber():
     def __init__(self, subscribe_to: List[NotificationType]) -> None:
-        # it lets to limit the number of notifications in the queue for each subscriber
+        # it lets to limit the number of notifications in the queue for each subscriber
         # so the subscriber can't block the server
         MAX_QUEUE_SIZE = 100
         

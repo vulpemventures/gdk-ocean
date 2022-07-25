@@ -13,7 +13,7 @@ LOCKTIME_SECONDS = 90
 class Locker():
     def __init__(self) -> None:
         self._locked_utxos: Dict[int, List[Utxo]] = {}
-        # accounts_by_utxo is a dict of utxo outpoints as str -> account_name
+        # accounts_by_utxo is a dict of utxo outpoints as str -> account_name
         # this is used to get the account name of the utxo when it is unlocked
         self._accounts_by_utxo: Dict[str, str] = {}
         self.notifications_queue: asyncio.Queue = None
@@ -44,7 +44,7 @@ class Locker():
         
         all_utxos = [u for utxos in self._locked_utxos.values() for u in utxos]
         for u in all_utxos:
-            if u["txid"] == outpoint.txid and u["index"] == outpoint.index:
+            if u.txid == outpoint.txid and u.index == outpoint.index:
                 return True
         
         return False

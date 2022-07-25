@@ -34,6 +34,7 @@ class GrpcTransactionServicer(transaction_pb2_grpc.TransactionServiceServicer):
         return transaction_pb2.BroadcastTransactionResponse(txid=txid)
     
     def CreatePset(self, request: transaction_pb2.CreatePsetRequest, context) -> transaction_pb2.CreatePsetResponse:
+        txid = self._svc.create_pset()
         pass
     
     def UpdatePset(self, request, context):

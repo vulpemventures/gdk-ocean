@@ -7,7 +7,7 @@ def make_session(network: str) -> gdk.Session:
 def gdk_resolve(auth_handler):
     # Processes and handles the state of calls that need authentication.
     # The authentication process works as a state machine and may require input to progress in case of 2FA enabled.
-    # this implementation raises an error in case of 2FA enabled.
+    # this implementation raises an error in case of 2FA enabled.
     while True:
         status = gdk.auth_handler_get_status(auth_handler)
         status = json.loads(status)
