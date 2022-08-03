@@ -2,7 +2,7 @@ FROM python:3.9-slim-bullseye
 
 EXPOSE 50051
 
-# set up de virtual env
+# set up virtual env
 ENV VIRTUAL_ENV=/opt/venv
 RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
