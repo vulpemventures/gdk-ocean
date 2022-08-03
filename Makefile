@@ -10,3 +10,9 @@ deps:
 
 run:
 	python gdk-ocean.py
+
+docker-image:
+	docker build -t gdk-ocean .  
+
+container:
+	docker run -it --net=host gdk-ocean
