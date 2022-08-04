@@ -56,7 +56,7 @@ pip install -r requirements_cli.txt
 
 The CLI can connect to a gdk-ocean server using `--host` and `--port` options
 ```bash
-python cli.py --host localhost --port 50051 <command>
+python cli.py --address 0.0.0.0:8080 <command>
 python cli.py <command> # if not set, cli.py requests localhost:50051 by default
 ``` 
 

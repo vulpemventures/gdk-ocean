@@ -1,4 +1,5 @@
 import logging
+from typing import Tuple
 import click
 import grpc
 from ocean.v1alpha import wallet_pb2_grpc, wallet_pb2, account_pb2_grpc, account_pb2, types_pb2, transaction_pb2_grpc, transaction_pb2, notification_pb2, notification_pb2_grpc
@@ -26,15 +27,24 @@ def _get_transaction_stub_from_context(ctx: click.Context) -> transaction_pb2_gr
 def _get_notification_stub_from_context(ctx: click.Context) -> notification_pb2_grpc.NotificationServiceStub:
     return ctx.obj['notification']
 
+def parse_address(address: str) -> Tuple[str, int]:
+    if ':' in address:
+        host, port = address.split(':')
+        if not host:
+            host = '0.0.0.0'
+        return host, int(port)
+    else:
+        raise click.BadParameter(f'invalid address {address}')
+    
 @click.group()
 @click.option('--debug', is_flag=True, default=True)
-@click.option('--host', default='localhost')
-@click.option('--port', default=50051)
+@click.option('--address', '-a', default='localhost:50051')
 @click.pass_context
-def cli(ctx: click.Context, debug: bool, host: str, port: int):
+def cli(ctx: click.Context, debug: bool, address: str):
     """
     A command line interface for gdk-ocean.
     """
+    host, port = parse_address(address)
     channel = grpc.insecure_channel(f'{host}:{port}')
     wallet_svc = wallet_pb2_grpc.WalletServiceStub(channel)
     account_svc = account_pb2_grpc.AccountServiceStub(channel)
