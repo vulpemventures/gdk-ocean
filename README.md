@@ -68,7 +68,7 @@ In your virtual enviroment, install the CLI dependencies:
 pip install -r requirements_cli.txt
 ```
 
-> if you are running the server in a container or if u don't want to mix CLI & server env, you can recreate another virtual one with: `python3.9 -m venv venv_cli`
+> if you are running the server in a container or if u don't want to mix CLI & server env, you can create venv with: `python3.9 -m venv venv_cli`
 
 The CLI can connect to a gdk-ocean server using `--host` and `--port` options
 ```bash
