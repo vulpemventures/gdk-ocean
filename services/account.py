@@ -1,6 +1,5 @@
 from domain.address_details import AddressDetails
 from domain.gdk_account import GdkAccount
-from domain.gdk_wallet import GdkWallet
 from typing import Dict, List
 
 from domain.utxo import Utxo
