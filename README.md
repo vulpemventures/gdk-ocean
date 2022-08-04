@@ -8,13 +8,17 @@ gdk-ocean is a Liquid wallet running on a gRPC server. It implements the [ocean 
 
 The current version of gdk-ocean uses Python 3.9
 
-Run the server in any Python 3.9 environmnent:
-```
-make run
-```
-By default, the server is running on port 50051.
-
 __the first time you run the program, you have to set up the virtual env with all dependencies.__
+
+Init the submodules:
+```
+git submodule update --init --recursive
+```
+
+And copy the stubs:
+```
+make stubs
+```
 
 Create virtual env (it needs Python 3.9 installed)
 ```
@@ -24,11 +28,16 @@ make env
 Then, activate the env and install the `requirements.txt` deps.
 ```
 source venv/bin/activate
-make stubs
 make deps
 ```
 
 At any moment, you can leave the venv with `deactivate`.
+
+Now you can run the server in any Python 3.9 environmnent:
+```
+make run
+```
+By default, the server is running on port 50051.
 
 ## Run gdk-ocean in a Docker container
 
