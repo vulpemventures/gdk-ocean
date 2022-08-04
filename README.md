@@ -41,6 +41,12 @@ By default, the server is running on port 50051.
 
 ## Run gdk-ocean in a Docker container
 
+Init the submodules and copy the proto stubs:
+```
+git submodule update --init --recursive
+make stubs
+```
+
 Build the image:
 ```bash
 docker build -t gdk-ocean . # -t is the image name
@@ -50,7 +56,6 @@ Run a container:
 ```bash
 docker run gdk-ocean 
 ```
-> You may need to set `--net=host` option on linux OS if you plan to request the server via the `localhost` address.
 
 Once the container is running, you can request it via the exposed port 50051.
 
@@ -58,10 +63,12 @@ Once the container is running, you can request it via the exposed port 50051.
 
 You can communicate with gdk-ocean using the `cli.py` script. It must be run by python3.9.
 
-Install the required dependencies:
+In your virtual enviroment, install the CLI dependencies:
 ```bash
 pip install -r requirements_cli.txt
 ```
+
+> if you are running the server in a container or if u don't want to mix CLI & server env, you can recreate another virtual one with: `python3.9 -m venv venv_cli`
 
 The CLI can connect to a gdk-ocean server using `--host` and `--port` options
 ```bash
