@@ -24,6 +24,7 @@ make env
 Then, activate the env and install the `requirements.txt` deps.
 ```
 source venv/bin/activate
+make stubs
 make deps
 ```
 
