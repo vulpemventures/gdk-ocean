@@ -49,6 +49,8 @@ Once the container is running, you can request it via the exposed port 50051.
 
 You can communicate with gdk-ocean using the `cli.py` script. It must be run by python3.9.
 
+First of all, u have to install click in the env with `pip install click`. Or using the requirements_cli.txt file.
+
 The CLI can connect to a gdk-ocean server using `--host` and `--port` options.
 
 ```bash
