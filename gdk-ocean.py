@@ -46,7 +46,7 @@ async def main():
     transaction_pb2_grpc.add_TransactionServiceServicer_to_server(transaction_servicer, server)
     account_pb2_grpc.add_AccountServiceServicer_to_server(account_servicer, server)
 
-    # notificiation servicer is async, we need to await the start of notifications service
+    # notificiation servicer is async, we need to await the start of notifications service
     logging.debug("start the notifications service...")
     notifications_servicer = await GrpcNotificationsServicer.create(notifications_service)
     notification_pb2_grpc.add_NotificationServiceServicer_to_server(notifications_servicer, server)

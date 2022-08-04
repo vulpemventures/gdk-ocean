@@ -24,7 +24,7 @@ class Utxo():
         )
 
 def make_utxos_list_proto(account_name: str, utxos: List[Utxo]) -> types_pb2.Utxos:
-    return types_pb2.UtxosList(
+    return types_pb2.Utxos(
         account_key=AccountKey.from_name(account_name).to_proto(),
         utxos=[utxo.to_proto() for utxo in utxos]
     )
