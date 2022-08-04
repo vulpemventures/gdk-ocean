@@ -58,7 +58,7 @@ Once the container is running, you can request it via the exposed port 50051.
 
 You can communicate with gdk-ocean using the `cli.py` script. It must be run by python3.9.
 
-First of all, u have to install the CLI dependencies using the `requirements_cli.txt` file:
+Install the required dependencies:
 ```bash
 pip install -r requirements_cli.txt
 ```
