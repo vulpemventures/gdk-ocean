@@ -1,6 +1,0 @@
-make --dry-run --always-make --keep-going --print-directory
-make: Entering directory '/home/louis/Work/Vulpem/gdk-ocean'
-rm -rf ocean
-cp -r specs/api-spec/protobuf/gen/python/ocean ocean
-make: Leaving directory '/home/louis/Work/Vulpem/gdk-ocean'
- 
