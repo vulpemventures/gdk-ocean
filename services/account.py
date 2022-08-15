@@ -1,17 +1,15 @@
 from domain.address_details import AddressDetails
-from domain.gdk import GdkAccountAPI
+from domain.gdk import GdkAPI, GdkAccountAPI
 from typing import Dict, List
 
 import greenaddress as gdk
 from domain.locker import Locker
 from domain.types import Outpoint, Utxo
-from services.wallet import WalletService
 
 class AccountService:
-    def __init__(self, wallet_svc: WalletService, locker: Locker):
-        self._wallet_svc = wallet_svc
+    def __init__(self, session: gdk.Session, locker: Locker):
         self._locker = locker
-        self._gdkAPI = wallet_svc._gdkAPI
+        self._gdkAPI = GdkAPI(session)
         
     def _account_exists_guard(self, account_name: str):
         """check if the account already exists"""

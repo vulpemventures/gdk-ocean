@@ -3,6 +3,7 @@ import logging
 from typing import Dict, Set, List
 from domain import BaseNotification, TxConfirmedNotification, UtxoSpentNotification, UtxoUnspecifiedNotification, Utxo, get_block_details, GdkAPI
 import greenaddress as gdk
+from services import wallet
 
 from services.wallet import WalletService
 
@@ -42,9 +43,9 @@ def _diff_utxos_list(current: Dict[str, List[Utxo]], new: Dict[str, List[Utxo]],
     return notifs
 
 class NotificationsService():
-    def __init__(self, session: gdk.Session, wallet_svc: WalletService) -> None:
-        self._session = session
-        self._gdk_api = GdkAPI(session)
+    def __init__(self, wallet_svc: WalletService) -> None:
+        self._session = wallet_svc._gdkAPI.session
+        self._gdk_api = wallet_svc._gdkAPI
         self._started = False
         self._wallet_svc = wallet_svc
         

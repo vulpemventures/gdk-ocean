@@ -24,10 +24,11 @@ def test_create_pset():
 @pytest.mark.asyncio
 @pytest.mark.skip('not implemented')
 async def test_send_pset():
-    walletSvc = WalletService(FilePinDataRepository('pin_data.json'), 'local')
+    session = make_session('testnet-liquid')
+    walletSvc = WalletService(session, FilePinDataRepository('pin_data.json'))
     locker = await Locker.create()
-    transactionSvc = TransactionService(walletSvc, locker)
-    accountSvc = AccountService(walletSvc, locker)
+    transactionSvc = TransactionService(session, locker)
+    accountSvc = AccountService(session, locker)
     await walletSvc.create_wallet(TEST_MNEMONIC, TEST_PASSWORD)
     # await walletSvc.login()
 
@@ -70,6 +71,7 @@ async def test_send_pset():
     h = wally.tx_to_hex(tx, 0)
     
 @pytest.mark.asyncio
+@pytest.mark.skip('not implemented')
 async def test_send_amp_confidential_pset():
     session = make_session('testnet-liquid')
     walletSvc = WalletService(session, FilePinDataRepository('pin_data.json'))

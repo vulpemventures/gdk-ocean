@@ -1,13 +1,11 @@
 from ast import Dict
-from domain.locker import Locker
-from domain.types import Outpoint, make_utxos_list_proto
-from services.account import AccountService
+from domain import Outpoint, make_utxos_list_proto
+from services import AccountService
 from ocean.v1alpha import account_pb2, account_pb2_grpc, types_pb2
 
 class GrpcAccountServicer(account_pb2_grpc.AccountServiceServicer):
-    def __init__(self, accountService: AccountService, locker: Locker) -> None:
+    def __init__(self, accountService: AccountService) -> None:
         self._svc = accountService
-        self.locker = locker
     
     def CreateAccount(self, request: account_pb2.CreateAccountRequest, _) -> account_pb2.CreateAccountResponse:
         self._svc.create_account(request.name)
@@ -46,7 +44,7 @@ class GrpcAccountServicer(account_pb2_grpc.AccountServiceServicer):
         spendable = []
         locked = []
         for utxo in utxos:
-            if self.locker.is_locked(Outpoint.from_utxo(utxo)):
+            if self._svc._locker.is_locked(Outpoint.from_utxo(utxo)):
                 locked.append(utxo)
             else:
                 spendable.append(utxo)

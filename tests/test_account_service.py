@@ -12,7 +12,7 @@ async def init_account_service() -> Tuple[AccountService, GdkAPI]:
     seed = walletSvc.generate_seed()
     walletSvc.create_wallet(seed, 'testdonotuse')
     locker = await Locker.create()
-    accountSvc = AccountService(walletSvc, locker)
+    accountSvc = AccountService(session, locker)
     return accountSvc, GdkAPI(session)
 
 @pytest.mark.asyncio
