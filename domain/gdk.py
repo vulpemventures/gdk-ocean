@@ -1,10 +1,11 @@
-from re import I
+import http
+import json
 from typing import Dict, List, Tuple, TypedDict
 import greenaddress as gdk
 from domain.address_details import AddressDetails
 from domain.pin_data_repository import PinData
 from domain.receiver import Receiver, receiver_to_dict
-from domain.utxo import GdkUtxo, Utxo
+from domain.types import BlockDetails, GdkUtxo, Utxo
 
 class AccountDetails(TypedDict):
     name: str
@@ -109,12 +110,13 @@ class GdkAccountAPI():
         hex_tx = details['transaction']
         self.session.send_transaction(details).resolve()
         return hex_tx
-
+    
 class GdkAPI:
+    AMP_ACCOUNT_TYPE = '2of2_no_recovery'
+    TWO_OF_TWO_ACCOUNT_TYPE = '2of2'
+    
     def __init__(self, session: gdk.Session):
         self.session = session
-        self.AMP_ACCOUNT_TYPE = '2of2_no_recovery'
-        self.TWO_OF_TWO_ACCOUNT_TYPE = '2of2'
 
     def register_user(self, mnemonic: str) -> str:
         """creates a new gdk wallet"""
@@ -163,6 +165,7 @@ class GdkAPI:
         for a in all_accounts:
             if a.name == account_name:
                 return a
+        raise ValueError('Account "{}" not found'.format(account_name))
         
     def create_new_account(self, account_key: str, is_amp: bool) -> GdkAccountAPI:
         """create a new gdk subaccount"""
@@ -205,3 +208,37 @@ class GdkAPI:
         """get a transaction by txid"""
         return self.session.get_transaction_details(txid)['transaction']
  
+def make_session(network: str) -> gdk.Session:
+    return gdk.Session({'name': network})
+
+def get_esplora_url(network: str) -> Tuple[str, str]:
+    """returns the esplora host and base url (depends on network)"""
+    blockstream_host = 'blockstream.info'
+    base = '/{}/api'
+
+    if network == 'testnet-liquid':
+        return blockstream_host, base.format('liquidtestnet')
+
+    if network == 'liquid':
+        return blockstream_host, base.format('liquid')
+
+    raise Exception("Unable to find base esplora url for network {}".format(network))
+
+def get_tx_status(network: str, txid: str) -> Dict:
+    host, base_url = get_esplora_url(network)
+    conn = http.client.HTTPSConnection(host)
+    conn.request('GET', '{}/tx/{}/status'.format(base_url, txid))
+    response = conn.getresponse()
+    
+    if response.status != 200:
+        raise Exception("Error getting transaction status: {} {}".format(response.status, response.reason))
+
+    return json.loads(response.read())
+
+def get_block_details(network: str, txid: str) -> BlockDetails:
+    tx_status = get_tx_status(network, txid)
+    
+    if not tx_status["confirmed"]:
+        raise Exception("Transaction not confirmed, impossible to fetch block details")
+
+    return BlockDetails(tx_status["block_hash"], tx_status["block_height"], tx_status["block_time"])

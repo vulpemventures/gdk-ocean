@@ -1,7 +1,34 @@
 from typing import TypedDict, List
-from domain.account_key import AccountKey
 from ocean.v1alpha import types_pb2
 import wallycore as wally
+
+class AccountKey():
+    def __init__(self, name: str, account_id: int) -> None:
+        self.name = name
+        self.id = account_id
+        
+    @classmethod
+    def from_name(cls, name: str) -> 'AccountKey':
+        return cls(name, 0)
+    
+    def to_proto(self) -> types_pb2.AccountKey:
+        return types_pb2.AccountKey(
+            name=self.name,
+            id=self.id,
+        )
+
+class BlockDetails():
+    def __init__(self, block_hash: str, block_height: int, block_time: int):
+        self.block_hash = block_hash
+        self.block_height = block_height
+        self.block_time = block_time
+    
+    def to_proto(self) -> types_pb2.BlockDetails:
+        return types_pb2.BlockDetails(
+            hash=bytes.fromhex(self.block_hash),
+            height=self.block_height,
+            timestamp=self.block_time,
+        )
 
 class InputBlindingData(TypedDict):
     asset_blinder: bytes

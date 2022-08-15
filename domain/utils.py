@@ -2,11 +2,10 @@ from binascii import unhexlify
 from wallycore import *
 
 from domain.gdk import GdkAPI
-from domain.utxo import GdkUtxo
+from domain.types import GdkUtxo
 
 CONFIDENTIAL_PREFIXES = [0x0a, 0x0b]
 UNCONFIDENTIAL_PREFIX = 0x01
-
 
 class Asset:
     def __init__(self, prefix: int, value: bytes):

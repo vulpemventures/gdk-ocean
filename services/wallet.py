@@ -8,7 +8,7 @@ class WalletService:
         self._pin_data_repository = pin_data_repo
         self._gdkAPI = GdkAPI(session)
     
-    def _is_logged(self) -> bool:
+    def is_logged(self) -> bool:
         """is_logged returns True in case of wallet is ready to be used"""
         if self._gdkAPI is None or self._gdkAPI.session is None:
             return False
@@ -29,14 +29,14 @@ class WalletService:
         self._pin_data_repository.write(pin_data)
 
     def login_with_mnemonic(self, mnemonic: str) -> None:
-        if self._is_logged():
+        if self.is_logged():
             raise Exception('Wallet is already logged in')
         
         logging.debug('logging in...')
         self._gdkAPI.login_with_mnemonic(mnemonic)
     
     def login_with_pin(self, pin: str) -> None:
-        if self._is_logged():
+        if self.is_logged():
             raise Exception('Wallet is already logged in')
         
         logging.debug('logging in...')
@@ -45,5 +45,5 @@ class WalletService:
         self._gdkAPI.login_with_pindata(pin_data, pin)
     
     def change_password(self, password: str, newPassword: str) -> None:
-        pass
+        raise Exception('Not implemented')
     

@@ -1,11 +1,7 @@
 import asyncio
 import logging
-from sys import last_traceback
-from time import time
 from typing import Dict, Set, List
-from domain.gdk import GdkAPI
-from domain.notification import BaseNotification, TxConfirmedNotification, UtxoSpentNotification, UtxoUnspecifiedNotification
-from domain.utxo import Utxo
+from domain import BaseNotification, TxConfirmedNotification, UtxoSpentNotification, UtxoUnspecifiedNotification, Utxo, get_block_details, GdkAPI
 import greenaddress as gdk
 
 from services.wallet import WalletService
@@ -26,7 +22,6 @@ def _diff_utxos_list(current: Dict[str, List[Utxo]], new: Dict[str, List[Utxo]],
         new = {}
     
     notifs: List[BaseNotification] = []
-    
     current_list: List[Utxo] = []
     new_list: List[Utxo] = []
     
@@ -97,7 +92,7 @@ class NotificationsService():
         for account in self._gdk_api.get_acccounts():
             try:
                 txs_for_height = account.transactions(last_block_heigth)
-                notifications = notifications + [TxConfirmedNotification(tx['txhash'], wallet.get_block_details(tx['txhash']), account_name) for tx in txs_for_height] 
+                notifications = notifications + [TxConfirmedNotification(tx['txhash'], get_block_details(tx['txhash']), account.name) for tx in txs_for_height] 
             except Exception as e:
                 logging.exception(e)
                 continue
@@ -113,7 +108,7 @@ class NotificationsService():
         """this let to wait for the wallet is ready (either unlocked or created if not exist)"""
         while True:
             try:
-                if self._wallet_svc._is_logged():
+                if self._wallet_svc.is_logged():
                     return
                 raise 'wallet not logged'
             except:

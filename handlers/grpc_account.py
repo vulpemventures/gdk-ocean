@@ -1,6 +1,6 @@
 from ast import Dict
 from domain.locker import Locker
-from domain.utxo import Outpoint, make_utxos_list_proto
+from domain.types import Outpoint, make_utxos_list_proto
 from services.account import AccountService
 from ocean.v1alpha import account_pb2, account_pb2_grpc, types_pb2
 

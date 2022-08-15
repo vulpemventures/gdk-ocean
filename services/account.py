@@ -1,29 +1,32 @@
 from domain.address_details import AddressDetails
-from domain.gdk import GdkAPI, GdkAccountAPI
+from domain.gdk import GdkAccountAPI
 from typing import Dict, List
 
 import greenaddress as gdk
 from domain.locker import Locker
-from domain.utxo import Outpoint, Utxo
+from domain.types import Outpoint, Utxo
 from services.wallet import WalletService
 
 class AccountService:
-    def __init__(self, session: gdk.Session, locker: Locker,  wallet_svc: WalletService) -> None:
+    def __init__(self, wallet_svc: WalletService, locker: Locker):
         self._wallet_svc = wallet_svc
         self._locker = locker
-        self._gdkAPI = GdkAPI(session)
+        self._gdkAPI = wallet_svc._gdkAPI
+        
+    def _account_exists_guard(self, account_name: str):
+        """check if the account already exists"""
+        existing_accounts = self._gdkAPI.get_acccounts()
+        if account_name in [a.name for a in existing_accounts]:
+            raise Exception(f'account {account_name} already exists')
         
     def create_amp_account(self, account_name: str) -> GdkAccountAPI:
         """create a new GDK account for AMP assets"""
+        self._account_exists_guard(account_name)
         return self._gdkAPI.create_new_account(account_name, True)
     
     def create_account(self, account_name: str) -> GdkAccountAPI:
         """create a new GDK account"""
-        existing_accounts = self._gdkAPI.get_acccounts()
-        names = [a.name for a in existing_accounts]
-        if account_name in names:
-            raise Exception(f'account {account_name} already exists')
-        
+        self._account_exists_guard(account_name)
         return self._gdkAPI.create_new_account(account_name, False)
     
     def derive_address(self, account_name: str, num_addresses: int) -> List[AddressDetails]:

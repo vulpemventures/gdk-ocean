@@ -4,7 +4,7 @@ from typing import List, Tuple
 from domain.gdk import GdkAPI, TransactionDetails
 from domain.locker import Locker
 from domain.receiver import Receiver
-from domain.utxo import CoinSelectionResult, InputBlindingData, Outpoint, Utxo 
+from domain.types import CoinSelectionResult, InputBlindingData, Outpoint, Utxo 
 import greenaddress as gdk
 import wallycore as wally
 import secrets

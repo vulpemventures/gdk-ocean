@@ -1,25 +1,18 @@
 from binascii import unhexlify
 import pytest
 import wallycore as wally
-import greenaddress as gdk
-from domain.gdk import GdkAPI
-from domain.gdk_utils import make_session
-from domain.locker import Locker
-from domain.pin_data_repository import FilePinDataRepository, InMemoryPinDataRepository
-from domain.utils import Asset, add_input_utxo
+from domain import FilePinDataRepository, Asset, make_session, Locker, add_input_utxo, GdkAPI, InMemoryPinDataRepository
 
 from services.transaction import TransactionService
 from services.wallet import WalletService
 from services.account import AccountService
 
-gdk.init({})
-
 TEST_PASSWORD = 'testdonotuse'
 TEST_MNEMONIC = 'fault barrel struggle connect render join style comic divert provide cable field social normal retreat space gospel ribbon diet gallery elegant equip grant mammal'
 
 def test_create_pset():
-    walletSvc = WalletService('localtest-liquid')
-    transactionSvc = TransactionService(walletSvc)
+    session = make_session('testnet-liquid')
+    transactionSvc = TransactionService(session, Locker())
     psetb64 = transactionSvc.create_empty_pset()
     pset = wally.psbt_from_base64(psetb64)
     assert pset is not None
@@ -32,8 +25,9 @@ def test_create_pset():
 @pytest.mark.skip('not implemented')
 async def test_send_pset():
     walletSvc = WalletService(FilePinDataRepository('pin_data.json'), 'local')
-    transactionSvc = TransactionService(walletSvc)
-    accountSvc = AccountService(walletSvc)
+    locker = await Locker.create()
+    transactionSvc = TransactionService(walletSvc, locker)
+    accountSvc = AccountService(walletSvc, locker)
     await walletSvc.create_wallet(TEST_MNEMONIC, TEST_PASSWORD)
     # await walletSvc.login()
 
@@ -83,7 +77,6 @@ async def test_send_amp_confidential_pset():
     walletSvc.login_with_pin(TEST_PASSWORD)
     lockerSvc = await Locker.create()
     transactionSvc = TransactionService(session, lockerSvc)
-    accountSvc = AccountService(session, lockerSvc, walletSvc)
 
     fees_selection = transactionSvc.select_utxos('amp', '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49', 1000)
     amp_selection = transactionSvc.select_utxos('amp', 'bea126b86ac7f7b6fc4709d1bb1a8482514a68d35633a5580d50b18504d5c322', 1)
@@ -92,7 +85,8 @@ async def test_send_amp_confidential_pset():
     fee_utxo = fees_selection.utxos[0]
 
     receiveAddr = 'vjTvPHdcJFZrYL9LmFpPootd1tmWqzugF9MXwhet6cdeCKEK6WJrb2mPEQGw7WNpikAoTq9ui22GU2pS' 
-    receiveScript = wally.address_to_scriptpubkey(receiveAddr, 'testnet-liquid')
+    out = bytearray()
+    receiveScript = wally.address_to_scriptpubkey(receiveAddr, wally.WALLY_NETWORK_LIQUID_TESTNET)
     blindingPubKey = wally.confidential_addr_to_ec_public_key(receiveAddr, wally.WALLY_CA_PREFIX_LIQUID_TESTNET)
 
     pset = wally.psbt_from_base64(transactionSvc.create_empty_pset())

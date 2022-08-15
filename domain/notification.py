@@ -1,8 +1,6 @@
 from typing import Any
-from domain.account_key import AccountKey
-from domain.block_details import BlockDetails
 from ocean.v1alpha import notification_pb2, types_pb2
-from domain.utxo import Utxo
+from domain import Utxo, AccountKey, BlockDetails
 from enum import Enum
 
 class NotificationType(Enum):

@@ -1,49 +1,30 @@
-import json
 import pytest
-from domain.gdk_utils import make_session
-from domain.pin_data_repository import FilePinDataRepository, InMemoryPinDataRepository
 from services.wallet import WalletService
-import greenaddress as gdk
-import wallycore as wally
+from domain import make_session, InMemoryPinDataRepository
 
 @pytest.fixture
 def static_pin_data():
-    # test data for login call, password is "test"
-    return json.loads("{\"encrypted_data\": \"0e0cba65a194175ff6190de56ae029af5468b179ec35d727a9dac2cf1248e4a0f775fee0190accff12113eff99b54394016653a2a05d1cad837789dc27a7bdb7202cc4a7818fa3101bbcebbf70092fff513b3878c0541290edf48ad3f2a6ade8b850c3f8ab7d3b79d97b1d54cf0ba38c361d27cebcc28a720360d4f62702caa07ee870b08c8b7233507b41026e9e74e8e96e19b773654b638f4a1519032fc111c43c63ea70452144acf555939f06bf9e\", \"pin_identifier\": \"e4d0f354-41a4-4a31-83ba-454e1ed97825\", \"salt\": \"oKytrCoTo+dqHYEzcSo0jw==\"}")
-
-@pytest.fixture(scope="function")
-def repository():
-    return InMemoryPinDataRepository()
+    # test data for login call, password is "testdonotuse"
+    return {"encrypted_data": "6465b118a4b672db35a502fc85a7edcbcaaf3d7acb45893e5d92bb1a25cff5bf8f94e8053dc7d7ff176e2fbb47716e8e97788b6707b0ee873ca4f6724e56e0e6752abf8b4d10d9fc1c44f9ccc9024a7cc182dfcfa4c997b4ba94530633b6545410927d1039bb288b00d5a51d3ec9c1110f01d01ee6844781a47323eee3f7ef2a81cccb16b614b82fc02172a1c0e66c667a83e6d5a62163a02902663a0c066702edac847277990492df19a52b34fcc492954d2e8ff16fa02f25b4da3abaea8572618c6f96d5a237070431fbdcab1cc22e", "pin_identifier": "1fbf94a0-9265-4d58-ad88-080e041b67e4", "salt": "SBzZ3uK6RPC6HIHEgYvGVg=="}
 
 @pytest.fixture
 def password():
-    return 'test'
+    return 'testdonotuse'
 
-@pytest.mark.asyncio
-async def test_login(static_pin_data):
+def test_login(static_pin_data, password):
+    session = make_session('testnet-liquid')
     repo = InMemoryPinDataRepository()
     repo.write(static_pin_data)
-    walletSvc = WalletService(repo, 'testnet-liquid')
-    await walletSvc.login('test')
-    assert walletSvc.get_wallet().is_logged_in()
+    walletSvc = WalletService(session, repo)
+    walletSvc.login_with_pin(password)
+    assert walletSvc.is_logged() is True
 
-@pytest.mark.asyncio
-async def test_create_wallet(password: str):
-    walletSvc = WalletService(FilePinDataRepository('./pin.json'), 'testnet-liquid')
-    seed = walletSvc.generate_seed()
-    await walletSvc.create_wallet(seed, password)
-    wallet = walletSvc.get_wallet()
-    assert wallet is not None
-
-@pytest.mark.asyncio
-async def test_encrypt_with_pin():
-    details = {
-        'pin': 1875,
-        'plaintext': "test"
-    }
-        
+def test_create_wallet(password: str):
+    pin_data_repo = InMemoryPinDataRepository()
     session = make_session('testnet-liquid')
-    session = gdk.Session({'name': 'testnet-liquid'})
-    pin_data = session.encrypt_with_pin({ 'pin': '1234', 'plaintext': 'word word word word'}).resolve()
-    print(pin_data)
-    json_pin_data = json.dumps(pin_data['pin_data'])
+    walletSvc = WalletService(session, pin_data_repo)
+    seed = walletSvc.generate_seed()
+    walletSvc.create_wallet(seed, password)
+    assert walletSvc.is_logged() is True
+    pin_data = pin_data_repo.read()
+    assert pin_data is not None

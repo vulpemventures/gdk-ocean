@@ -1,6 +1,6 @@
 import logging
 from domain.receiver import Receiver
-from domain.utxo import make_utxos_list_proto
+from domain.types import make_utxos_list_proto
 from services.transaction import TransactionService
 from ocean.v1alpha import transaction_pb2, transaction_pb2_grpc
 
