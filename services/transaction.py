@@ -4,7 +4,7 @@ from domain import block_details
 from domain.receiver import Receiver
 from domain.utxo import CoinSelectionResult
 import greenaddress as gdk
-from ocean.v1alpha.types_pb2 import BlockDetails
+from ocean import v1alpha as proto
 from services.wallet import WalletService
 
 class TransactionService:
@@ -41,7 +41,7 @@ class TransactionService:
         fees = wallet.session.get_fee_estimates()["fees"]
         return fees[1] # 1 block confirmation, 0 is min-relay-fees
 
-    def get_transaction(self, txid: str) -> Tuple[str, BlockDetails]:
+    def get_transaction(self, txid: str) -> Tuple[str, proto.BlockDetails]:
         wallet = self._wallet_svc.get_wallet()
         wallet._get_tx_status(txid)
         tx_hex = wallet.get_transaction_hex(txid)

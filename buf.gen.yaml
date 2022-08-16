@@ -1,0 +1,5 @@
+version: v1
+plugins:
+  # Python
+  - remote: buf.build/judahrand/plugins/python-betterproto
+    out: .

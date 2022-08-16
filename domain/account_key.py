@@ -1,4 +1,4 @@
-from ocean.v1alpha import types_pb2
+from ocean import v1alpha as proto
 
 class AccountKey():
     def __init__(self, name: str, account_id: int) -> None:

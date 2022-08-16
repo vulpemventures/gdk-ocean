@@ -12,7 +12,7 @@ from services.transaction import TransactionService
 from services.wallet import WalletService
 
 from signal import SIGINT, SIGTERM
-from ocean.v1alpha import wallet_pb2_grpc, notification_pb2_grpc, transaction_pb2_grpc, account_pb2_grpc
+from ocean.v1 import wallet_pb2_grpc, notification_pb2_grpc, transaction_pb2_grpc, account_pb2_grpc
 import greenaddress as gdk
 
 # NETWORK = "liquid"
