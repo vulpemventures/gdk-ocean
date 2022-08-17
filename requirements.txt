@@ -5,3 +5,5 @@ grpcio==1.43.0
 grpcio-tools==1.43.0
 protobuf==3.19.3
 ./wallycore-0.8.5-cp39-cp39-linux_x86_64.whl # todo: request from github
+pytest
+pytest-asyncio

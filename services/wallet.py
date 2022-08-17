@@ -41,7 +41,6 @@ class WalletService:
         
         logging.debug('logging in...')
         pin_data = self._pin_data_repository.read()
-        print(pin_data)
         self._gdkAPI.login_with_pindata(pin_data, pin)
     
     def change_password(self, password: str, newPassword: str) -> None:

@@ -4,7 +4,7 @@ from typing import List, Tuple
 from domain.gdk import GdkAPI, TransactionDetails
 from domain.locker import Locker
 from domain.receiver import Receiver
-from domain.types import CoinSelectionResult, InputBlindingData, Outpoint, Utxo 
+from domain.types import CoinSelectionResult, GdkUtxo, InputBlindingData, Outpoint, Utxo 
 import greenaddress as gdk
 import wallycore as wally
 import secrets
@@ -100,14 +100,24 @@ class TransactionService:
                 continue
             blinding_nonces.append(wally.hex_from_bytes(wally.psbt_get_output_ecdh_public_key(psbt, out_index))[2:])
     
-        for input_index, utxo in utxos_to_sign:
+        num_in_signed = 0
+        for i, _ in utxos_to_sign:
             try:
-                signed_result = self._gdk_api.sign_pset(psetBase64, [utxo.gdk_utxo], blinding_nonces)   
+                utxos_arr = []
+                for in_index, u in utxos_to_sign:
+                    utxos_arr.append(skipped_utxo(u.gdk_utxo) if i != in_index else u.gdk_utxo)
+                
+                signed_result = self._gdk_api.sign_pset(psetBase64, utxos_arr, blinding_nonces)   
                 psetBase64 = signed_result['psbt']
+                num_in_signed += 1
             except Exception as e:
-                logging.warn('Failed to sign input {}, reason: {}'.format(input_index, e))
+                logging.warning('Failed to sign input {}, reason: {}'.format(in_index, e))
                 continue
-        return signed_result['psbt']
+            
+        if num_in_signed == 0:
+            raise Exception("No inputs has been signed")    
+        
+        return psetBase64
 
     def transfer(self, account_key: str, receivers: List[Receiver]) -> str:
         account = self._gdk_api.get_account(account_key)
@@ -172,3 +182,8 @@ def blinding_status_guard_sign(output_index: int, blinding_status: int):
 
 def b2h_rev(b: bytes) -> str:
     return wally.hex_from_bytes(b[::-1])
+
+def skipped_utxo(u: GdkUtxo) -> GdkUtxo:
+    cpy = u
+    cpy['skip_signing'] = True
+    return u

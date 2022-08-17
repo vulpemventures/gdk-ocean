@@ -44,7 +44,8 @@ class Asset:
         return bytearray(self.value)
 
 
-def add_input_utxo(gdk_api: GdkAPI, psbt: str, utxo: GdkUtxo):
+def add_input_utxo(gdk_api: GdkAPI, psbtb64: str, utxo: GdkUtxo) -> str:
+    psbt = psbt_from_base64(psbtb64)
     # Add the input to the psbt
     idx = psbt_get_num_inputs(psbt)
     seq = 0xFFFFFFFE  # RBF not enabled for liquid yet
@@ -53,7 +54,7 @@ def add_input_utxo(gdk_api: GdkAPI, psbt: str, utxo: GdkUtxo):
     funding_tx = tx_from_hex(funding_tx_hex, WALLY_TX_FLAG_USE_ELEMENTS)
     psbt_set_input_witness_utxo_from_tx(psbt, idx, funding_tx, utxo['pt_idx'])
     psbt_set_input_utxo_rangeproof(psbt, idx, tx_get_output_rangeproof(funding_tx, utxo['pt_idx']))
-    return idx
+    return psbt_to_base64(psbt, 0)
 
 def h2b_rev(h: str):
     return hex_to_bytes(h)[::-1]

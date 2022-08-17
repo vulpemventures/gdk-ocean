@@ -201,7 +201,6 @@ class GdkAPI:
             'utxos': utxos,
             'blinding_nonces': blinding_nonces,
         }
-        print(details)
         return self.session.psbt_sign(details).resolve()
         
     def get_transaction_hex(self, txid: str) -> str:
