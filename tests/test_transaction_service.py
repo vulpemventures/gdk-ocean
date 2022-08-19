@@ -33,7 +33,7 @@ async def test_send_pset():
 
     addrs = accountSvc.derive_address(accountName, 2)
 
-    coinSelection = transactionSvc.select_utxos(accountName, '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49', 10000)
+    coinSelection = transactionSvc.select_utxos(accountName, '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49', 100000)
     
     gdkAPI = GdkAPI(session)
     psetb64 = transactionSvc.create_empty_pset()
@@ -48,36 +48,40 @@ async def test_send_pset():
         lbtc,
         wally.tx_confidential_value_from_satoshi(coinSelection.amount-500),
     )
+    wally.psbt_add_tx_output_at(pset, 0, 0, outputSend)
+    blindingPubKey = wally.confidential_addr_to_ec_public_key(addrs[0]['address'], wally.WALLY_CA_PREFIX_LIQUID_TESTNET)
+    wally.psbt_set_output_blinding_public_key(pset, 0, blindingPubKey)
+    wally.psbt_set_output_blinder_index(pset, 0, 0)
     
-    outputChange = wally.tx_elements_output_init(
-        unhexlify(addrs[1]['script']),
-        lbtc,
-        wally.tx_confidential_value_from_satoshi(coinSelection.change),
-    )
+    nextIndex = 1
+    
+    if coinSelection.change > 0:
+        outputChange = wally.tx_elements_output_init(
+            unhexlify(addrs[1]['script']),
+            lbtc,
+            wally.tx_confidential_value_from_satoshi(coinSelection.change),
+        )
+        wally.psbt_add_tx_output_at(pset, nextIndex, 0, outputChange)
+        blindingPubKey = wally.confidential_addr_to_ec_public_key(addrs[1]['address'], wally.WALLY_CA_PREFIX_LIQUID_TESTNET)
+        wally.psbt_set_output_blinding_public_key(pset, nextIndex, blindingPubKey)
+        wally.psbt_set_output_blinder_index(pset, nextIndex, 0)
+        nextIndex += 1
 
     outputFee = wally.tx_elements_output_init(
         None,
         lbtc,
         wally.tx_confidential_value_from_satoshi(500),
     )
-
-    wally.psbt_add_tx_output_at(pset, 0, 0, outputSend)
-    wally.psbt_add_tx_output_at(pset, 1, 0, outputChange)
-    wally.psbt_add_tx_output_at(pset, 2, 0, outputFee)
-
-    blindingPubKey = wally.confidential_addr_to_ec_public_key(addrs[0]['address'], wally.WALLY_CA_PREFIX_LIQUID_TESTNET)
-    wally.psbt_set_output_blinding_public_key(pset, 0, blindingPubKey)
-    wally.psbt_set_output_blinder_index(pset, 0, 0)
-    blindingPubKey = wally.confidential_addr_to_ec_public_key(addrs[1]['address'], wally.WALLY_CA_PREFIX_LIQUID_TESTNET)
-    wally.psbt_set_output_blinding_public_key(pset, 1, blindingPubKey)
-    wally.psbt_set_output_blinder_index(pset, 1, 0)
+    wally.psbt_add_tx_output_at(pset, nextIndex, 0, outputFee)
 
     b64 = wally.psbt_to_base64(pset, 0)
     blinded = transactionSvc.blind_pset(b64)
+    print(blinded)
     signed = transactionSvc.sign_pset(blinded)
     assert signed is not None
     
 @pytest.mark.asyncio
+@pytest.mark.skip(reason="not supported by gdk yet")
 async def test_send_amp_confidential_pset():
     session = make_session('testnet-liquid')
     walletSvc = WalletService(session, FilePinDataRepository('pin_data.json'))

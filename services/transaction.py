@@ -137,6 +137,7 @@ class TransactionService:
                 break
             selected_utxos.append(u)
             selected_amount += u.value
+            print('Selected UTXO: {}'.format(u.value))
         
         if selected_amount < amount:
             raise Exception("Not enough funds")
