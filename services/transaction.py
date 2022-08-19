@@ -1,4 +1,5 @@
 from binascii import hexlify
+import json
 import logging
 from typing import List, Tuple 
 from domain.gdk import GdkAPI, TransactionDetails
@@ -95,10 +96,13 @@ class TransactionService:
         blinding_nonces = []
         
         for out_index in range(outputs_len):
-            if wally.psbt_get_output_ecdh_public_key_len(psbt, out_index) == 0:
+            if wally.psbt_get_output_ecdh_public_key_len(psbt, out_index) == 0 or wally.psbt_get_output_blinding_public_key_len(psbt, out_index) == 0:
                 blinding_nonces.append('')
                 continue
-            blinding_nonces.append(wally.hex_from_bytes(wally.psbt_get_output_ecdh_public_key(psbt, out_index))[2:])
+            ephemeral_key = wally.psbt_get_output_ecdh_public_key(psbt, out_index)[1:]
+            blind_pub_key = wally.psbt_get_output_blinding_public_key(psbt, out_index)
+            nonce = wally.ecdh_nonce_hash(blind_pub_key, ephemeral_key)
+            blinding_nonces.append(wally.hex_from_bytes(nonce))
     
         num_in_signed = 0
         for i, _ in utxos_to_sign:
@@ -106,7 +110,6 @@ class TransactionService:
                 utxos_arr = []
                 for in_index, u in utxos_to_sign:
                     utxos_arr.append(skipped_utxo(u.gdk_utxo) if i != in_index else u.gdk_utxo)
-                
                 signed_result = self._gdk_api.sign_pset(psetBase64, utxos_arr, blinding_nonces)   
                 psetBase64 = signed_result['psbt']
                 num_in_signed += 1
@@ -137,7 +140,6 @@ class TransactionService:
                 break
             selected_utxos.append(u)
             selected_amount += u.value
-            print('Selected UTXO: {}'.format(u.value))
         
         if selected_amount < amount:
             raise Exception("Not enough funds")
@@ -148,9 +150,8 @@ class TransactionService:
         return result
 
     def estimate_fees(self) -> int:
-        wallet = self._wallet_svc.get_wallet()
-        fees = wallet.session.get_fee_estimates()["fees"]
-        return fees[1]  # 1 block confirmation, 0 is min-relay-fees
+        fees = self._gdk_api.get_fee_estimates(1)
+        return fees
 
     def get_transaction(self, txid: str) -> TransactionDetails:
         return self._gdk_api.get_transaction(txid)

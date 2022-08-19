@@ -206,6 +206,10 @@ class GdkAPI:
     def get_transaction_hex(self, txid: str) -> str:
         """get a transaction by txid"""
         return self.session.get_transaction_details(txid)['transaction']
+    
+    def get_fee_estimates(self, confirmationTarget: int) -> int:
+        """get fee estimates"""
+        return self.session.get_fee_estimates()['fees'][confirmationTarget]
  
 def make_session(network: str) -> gdk.Session:
     return gdk.Session({'name': network})
