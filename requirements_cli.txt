@@ -1,0 +1,5 @@
+click==8.0.3
+grpcio==1.43.0
+google==3.0.0
+protobuf==3.19.3
+grpcio-tools==1.43.0
