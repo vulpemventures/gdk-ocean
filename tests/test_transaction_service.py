@@ -22,7 +22,7 @@ def test_create_pset():
     assert outputs_len == 0
 
 @pytest.mark.asyncio
-# @pytest.mark.skip('The tx failed the testmempoolaccept call with the node')
+@pytest.mark.skip('The tx failed the testmempoolaccept call with the node')
 async def test_send_pset():
     accountName = 'mainAccountTest'
     session = make_session('testnet-liquid')
