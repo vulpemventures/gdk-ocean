@@ -67,7 +67,7 @@ class TransactionService:
         entropy = secrets.token_bytes(num_outputs_to_blind * 5 * 32)
 
         wally.psbt_blind(psbt, values, valueBlindingFactors,
-                         assets, assetBlindingFactors, entropy, 0)
+                         assets, assetBlindingFactors, entropy, 0xffffffff, 0)
         
         return wally.psbt_to_base64(psbt, 0)
 
