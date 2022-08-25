@@ -1,6 +1,5 @@
 from typing import TypedDict, List
-from domain.account_key import AccountKey
-from ocean.v1alpha import types_pb2
+from ocean.v1 import types_pb2
 
 class Utxo():
     def __init__(self, txid: str, index: int, asset: str, value: int, script: str, is_confirmed: bool, is_locked: bool) -> None:
@@ -25,7 +24,7 @@ class Utxo():
 
 def make_utxos_list_proto(account_name: str, utxos: List[Utxo]) -> types_pb2.Utxos:
     return types_pb2.Utxos(
-        account_key=AccountKey.from_name(account_name).to_proto(),
+        account_name,
         utxos=[utxo.to_proto() for utxo in utxos]
     )
 

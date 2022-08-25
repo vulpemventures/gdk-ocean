@@ -2,7 +2,7 @@ import logging
 from domain.receiver import Receiver
 from domain.utxo import make_utxos_list_proto
 from services.transaction import TransactionService
-from ocean.v1alpha import transaction_pb2, transaction_pb2_grpc
+from ocean.v1 import transaction_pb2, transaction_pb2_grpc
 
 class GrpcTransactionServicer(transaction_pb2_grpc.TransactionServiceServicer):
     def __init__(self, transactionService: TransactionService):

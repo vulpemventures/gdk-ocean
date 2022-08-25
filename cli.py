@@ -2,7 +2,7 @@ import logging
 from typing import Tuple
 import click
 import grpc
-from ocean import v1alpha as proto
+from ocean import v1 as proto
 
 # AccountKey class is a duplicate version of AccountKey class in domain/account_key.py
 # it lets to run the cli without the domain package (and thus without the dependencies)

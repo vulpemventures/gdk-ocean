@@ -4,7 +4,7 @@ from domain import block_details
 from domain.receiver import Receiver
 from domain.utxo import CoinSelectionResult
 import greenaddress as gdk
-from ocean import v1alpha as proto
+from ocean import v1 as proto
 from services.wallet import WalletService
 
 class TransactionService:

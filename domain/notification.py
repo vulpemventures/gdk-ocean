@@ -1,7 +1,7 @@
 from typing import Any
 from domain.account_key import AccountKey
 from domain.block_details import BlockDetails
-from ocean.v1alpha import notification_pb2, types_pb2
+from ocean.v1 import notification_pb2, types_pb2
 from domain.utxo import Utxo
 from enum import Enum
 

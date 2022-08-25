@@ -1,4 +1,4 @@
-from ocean.v1alpha import types_pb2
+from ocean.v1 import types_pb2
 
 class BlockDetails():
     def __init__(self, block_hash: str, block_height: int, block_time: int):
