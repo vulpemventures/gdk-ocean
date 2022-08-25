@@ -1,5 +1,7 @@
 version: v1
 plugins:
   # Python
-  - remote: buf.build/louisinger/plugins/python-betterproto
+  - remote: buf.build/protocolbuffers/plugins/python
+    out: .
+  - remote: buf.build/grpc/plugins/python
     out: .
