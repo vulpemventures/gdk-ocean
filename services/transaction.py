@@ -92,7 +92,7 @@ class TransactionService:
             witness_utxo = wally.psbt_get_input_witness_utxo(psbt, i)
             prevout_script = wally.tx_output_get_script(witness_utxo)
             for a in addresses:
-                if a['blinding_script'] == wally.hex_from_bytes(prevout_script) and a['script_type'] in ['csv', 'p2wsh']:
+                if a['blinding_script'] == wally.hex_from_bytes(prevout_script) and a['script_type'] in [14, 15]: # p2wsh, csv
                     script = wally.witness_program_from_bytes(wally.hex_to_bytes(a['script']), wally.WALLY_SCRIPT_SHA256)
                     wally.psbt_set_input_redeem_script(psbt, i, script)
                     break
