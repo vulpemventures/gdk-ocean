@@ -74,7 +74,7 @@ def add_input_utxo(gdk_api: GdkAPI, psbtb64: str, utxo: GdkUtxo) -> str:
         script = witness_program_from_bytes(pubkey, WALLY_SCRIPT_HASH160)
     else:
         assert False, 'unknown address type ' + utxo['address_type']
-    
+
     return psbt_to_base64(psbt, 0)
 
 def h2b_rev(h: str):

@@ -11,6 +11,8 @@ import greenaddress as gdk
 import wallycore as wally
 import secrets
 
+from services.account import AccountService
+
 # For each output to blind, we need 32 bytes of entropy for each of:
 # - Output assetblinder
 # - Output amountblinder
@@ -24,6 +26,7 @@ class TransactionService:
         self._session = session
         self._gdk_api = GdkAPI(session)
         self._locker = locker
+        self._account_service = AccountService(session, locker)
         self._ephemeral_priv_keys = {}
 
     def sign_transaction(self, txHex: str) -> str:
@@ -39,8 +42,14 @@ class TransactionService:
         }
         return self._session.psbt_get_details(details).resolve()
 
+    # TODO: rename to create_pset and accept lists of ins and outs as args.
     def create_empty_pset(self) -> str:
         pset = wally.psbt_init(2, 0, 0, 0, wally.WALLY_PSBT_INIT_PSET)
+        # TODO: Add ins
+        # TODO: Add ins witness utxos
+        # TODO: Add ins utxo rangeproofs
+        # TODO: Add ins redeem scripts for csv and p2wsh
+        # TODO: Add outputs (+ blinding pub key + blinder index)
         return wally.psbt_to_base64(pset, 0)
 
     def blind_pset(self, psetBase64: str) -> str:
@@ -76,6 +85,19 @@ class TransactionService:
         self._ephemeral_priv_keys[hexlify(psbt_id)] = ephemeral_key
         return wally.psbt_to_base64(psbt, 0)
 
+    def _add_redeem_scripts(self, psetBase64: str) -> str:
+        psbt = wally.psbt_from_base64(psetBase64)
+        addresses = self._account_service.list_all_addresses()
+        for i in range(wally.psbt_get_num_inputs(psbt)):
+            witness_utxo = wally.psbt_get_input_witness_utxo(psbt, i)
+            prevout_script = wally.tx_output_get_script(witness_utxo)
+            for a in addresses:
+                if a['blinding_script'] == wally.hex_from_bytes(prevout_script) and a['script_type'] in ['csv', 'p2wsh']:
+                    script = wally.witness_program_from_bytes(wally.hex_to_bytes(a['script']), wally.WALLY_SCRIPT_SHA256)
+                    wally.psbt_set_input_redeem_script(psbt, i, script)
+                    break
+        return wally.psbt_to_base64(psbt, 0)
+     
     def sign_pset(self, psetBase64: str) -> str:
         psbt = wally.psbt_from_base64(psetBase64)
         outputs_len = wally.psbt_get_num_outputs(psbt)
@@ -83,6 +105,9 @@ class TransactionService:
             out_status = wally.psbt_get_output_blinding_status(psbt, i, 0)
             # raise an error if blinding is required
             blinding_status_guard_sign(i, out_status)
+        
+        psetBase64 = self._add_redeem_scripts(psetBase64)
+        print("BASE64", psetBase64)
 
         utxos = self._gdk_api.get_all_utxos()
         utxos_to_sign: List[Tuple[int, Utxo]] = []
@@ -115,7 +140,6 @@ class TransactionService:
                 utxos_arr = []
                 for in_index, u in utxos_to_sign:
                     utxos_arr.append(skipped_utxo(u.gdk_utxo) if i != in_index else u.gdk_utxo)
-                print(utxos_arr)
                 signed_result = self._gdk_api.sign_pset(psetBase64, utxos_arr, blinding_nonces)   
                 psetBase64 = signed_result['psbt']
                 num_in_signed += 1

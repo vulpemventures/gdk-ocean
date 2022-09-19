@@ -40,6 +40,15 @@ class AccountService:
         """list all known addresses of the account"""
         account = self._gdkAPI.get_account(account_name)
         return account.addresses()
+
+    def list_all_addresses(self) -> List[AddressDetails]:
+        """list all accounts addresses"""
+        accounts = self._gdkAPI.get_acccounts()
+        result = []
+        for account in accounts:
+            for addresses in account.addresses():
+                result.append(addresses)
+        return result
     
     def balance(self, account_name: str, min_num_confs: int) -> Dict[str, int]:
         """get the balance of the account, include only unspent where min_num_confs is met"""

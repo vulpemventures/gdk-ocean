@@ -1,3 +1,5 @@
 from greenaddress import init
 
-init({})
+init({
+    "log_level": "debug",
+})

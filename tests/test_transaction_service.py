@@ -1,5 +1,4 @@
 from binascii import unhexlify
-import json
 import pytest
 import wallycore as wally
 from domain import FilePinDataRepository, Asset, make_session, Locker, add_input_utxo, GdkAPI, InMemoryPinDataRepository
@@ -82,7 +81,7 @@ async def test_send_pset():
     assert signed is not None
     
 @pytest.mark.asyncio
-# @pytest.mark.skip(reason="not supported by gdk yet, 'Tx contains unauthorized asset'")
+# @pytest.mark.skip(reason='["http:\/\/greenaddressit.com\/error#internal","Internal Error",{}')
 async def test_send_amp_confidential_pset():
     accountName = 'mainAccountTest'
     ampAccountName = 'ampAccountTest'
@@ -93,13 +92,12 @@ async def test_send_amp_confidential_pset():
     lockerSvc = await Locker.create()
     accountSvc = AccountService(session, lockerSvc)
     transactionSvc = TransactionService(session, lockerSvc)
-
     fees_selection = transactionSvc.select_utxos(accountName, '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49', 1000)
     amp_selection = transactionSvc.select_utxos(ampAccountName, 'bea126b86ac7f7b6fc4709d1bb1a8482514a68d35633a5580d50b18504d5c322', 1)
 
     utxo = amp_selection.utxos[0]
     fee_utxo = fees_selection.utxos[0]
-
+    
     receiveAddr = 'vjTvPHdcJFZrYL9LmFpPootd1tmWqzugF9MXwhet6cdeCKEK6WJrb2mPEQGw7WNpikAoTq9ui22GU2pS' 
     unconf = wally.confidential_addr_to_addr(receiveAddr, wally.WALLY_CA_PREFIX_LIQUID_TESTNET)
     receiveScript = wally.address_to_scriptpubkey(unconf, wally.WALLY_NETWORK_LIQUID_TESTNET)
@@ -117,16 +115,29 @@ async def test_send_amp_confidential_pset():
         amp_asset,
         wally.tx_confidential_value_from_satoshi(utxo.value),
     )
-
-    output1 = wally.tx_elements_output_init(
+    wally.psbt_add_tx_output_at(pset, 0, 0, output0)
+    wally.psbt_set_output_blinding_public_key(pset, 0, blindingPubKey)
+    wally.psbt_set_output_blinder_index(pset, 0, 0)
+    
+    if fees_selection.change > 0:
+        changeAddr = accountSvc.derive_address(accountName, 1)[0]
+        changeScript = changeAddr['script']
+        outputChange = wally.tx_elements_output_init(
+            unhexlify(changeScript),
+            lbtc,
+            wally.tx_confidential_value_from_satoshi(fees_selection.change),
+        )
+        wally.psbt_add_tx_output_at(pset, 1, 0, outputChange)
+        blindingPubKey = wally.confidential_addr_to_ec_public_key(changeAddr['address'], wally.WALLY_CA_PREFIX_LIQUID_TESTNET)
+        wally.psbt_set_output_blinding_public_key(pset, 1, blindingPubKey)
+        wally.psbt_set_output_blinder_index(pset, 1, 0)
+    
+    output_fee = wally.tx_elements_output_init(
         None,
         lbtc,
         wally.tx_confidential_value_from_satoshi(1000),
     )
-    wally.psbt_add_tx_output_at(pset, 0, 0, output0)
-    wally.psbt_add_tx_output_at(pset, 1, 0, output1)
-    wally.psbt_set_output_blinding_public_key(pset, 0, blindingPubKey)
-    wally.psbt_set_output_blinder_index(pset, 0, 0)
+    wally.psbt_add_tx_output_at(pset, 2, 0, output_fee)
 
     b64 = wally.psbt_to_base64(pset, 0)
     blinded = transactionSvc.blind_pset(b64)
