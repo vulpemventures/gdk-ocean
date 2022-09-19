@@ -1,7 +1,8 @@
 from binascii import hexlify
+from copy import copy
 import json
 import logging
-from typing import List, Tuple 
+from typing import Dict, List, Tuple 
 from domain.gdk import GdkAPI, TransactionDetails
 from domain.locker import Locker
 from domain.receiver import Receiver
@@ -23,6 +24,7 @@ class TransactionService:
         self._session = session
         self._gdk_api = GdkAPI(session)
         self._locker = locker
+        self._ephemeral_priv_keys = {}
 
     def sign_transaction(self, txHex: str) -> str:
         pass
@@ -35,7 +37,7 @@ class TransactionService:
             'psbt': psetBase64,
             'utxos': self._gdk_api.get_all_unspents_outputs(),
         }
-        return self._session.psbt_get_details(details)
+        return self._session.psbt_get_details(details).resolve()
 
     def create_empty_pset(self) -> str:
         pset = wally.psbt_init(2, 0, 0, 0, wally.WALLY_PSBT_INIT_PSET)
@@ -66,9 +68,12 @@ class TransactionService:
 
         entropy = secrets.token_bytes(num_outputs_to_blind * 5 * 32)
 
-        wally.psbt_blind(psbt, values, valueBlindingFactors,
+        ephemeral_key = wally.psbt_blind(psbt, values, valueBlindingFactors,
                          assets, assetBlindingFactors, entropy, 0xffffffff, 0)
         
+        psbt_id = wally.psbt_get_id(psbt, 0)
+        
+        self._ephemeral_priv_keys[hexlify(psbt_id)] = ephemeral_key
         return wally.psbt_to_base64(psbt, 0)
 
     def sign_pset(self, psetBase64: str) -> str:
@@ -99,22 +104,23 @@ class TransactionService:
             if wally.psbt_get_output_ecdh_public_key_len(psbt, out_index) == 0 or wally.psbt_get_output_blinding_public_key_len(psbt, out_index) == 0:
                 blinding_nonces.append('')
                 continue
-            ephemeral_key = wally.psbt_get_output_ecdh_public_key(psbt, out_index)[1:]
-            blind_pub_key = wally.psbt_get_output_blinding_public_key(psbt, out_index)
-            nonce = wally.ecdh_nonce_hash(blind_pub_key, ephemeral_key)
+            psbt_id = wally.psbt_get_id(psbt, 0)
+            ephemeral_keys = self._ephemeral_priv_keys[hexlify(psbt_id)]
+            nonce = get_blinding_nonce(psbt, ephemeral_keys, out_index)
             blinding_nonces.append(wally.hex_from_bytes(nonce))
     
         num_in_signed = 0
-        for i, _ in utxos_to_sign:
+        for i, utxo in utxos_to_sign:
             try:
                 utxos_arr = []
                 for in_index, u in utxos_to_sign:
                     utxos_arr.append(skipped_utxo(u.gdk_utxo) if i != in_index else u.gdk_utxo)
+                print(utxos_arr)
                 signed_result = self._gdk_api.sign_pset(psetBase64, utxos_arr, blinding_nonces)   
                 psetBase64 = signed_result['psbt']
                 num_in_signed += 1
             except Exception as e:
-                logging.warning('Failed to sign input {}, reason: {}'.format(in_index, e))
+                logging.warning('Failed to sign input {}, reason: {}'.format(i, e))
                 continue
             
         if num_in_signed == 0:
@@ -186,6 +192,11 @@ def b2h_rev(b: bytes) -> str:
     return wally.hex_from_bytes(b[::-1])
 
 def skipped_utxo(u: GdkUtxo) -> GdkUtxo:
-    cpy = u
+    cpy = copy(u)
     cpy['skip_signing'] = True
-    return u
+    return cpy
+
+def get_blinding_nonce(psbt, ephemeral_keys, output_index):
+    ephemeral_key = wally.map_get_item(ephemeral_keys, output_index)
+    blinding_pubkey = wally.psbt_get_output_blinding_public_key(psbt, output_index)
+    return wally.ecdh_nonce_hash(blinding_pubkey, ephemeral_key)

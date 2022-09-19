@@ -1,4 +1,5 @@
 from binascii import unhexlify
+import json
 import pytest
 import wallycore as wally
 from domain import FilePinDataRepository, Asset, make_session, Locker, add_input_utxo, GdkAPI, InMemoryPinDataRepository
@@ -8,7 +9,7 @@ from services.wallet import WalletService
 from services.account import AccountService
 
 TEST_PASSWORD = 'testdonotuse'
-TEST_MNEMONIC = 'fault barrel struggle connect render join style comic divert provide cable field social normal retreat space gospel ribbon diet gallery elegant equip grant mammal'
+TEST_MNEMONIC = 'merit choice antique call primary wise first foot fold fire right share'
 
 def test_create_pset():
     session = make_session('testnet-liquid')
@@ -33,9 +34,8 @@ async def test_send_pset():
     walletSvc.create_wallet(TEST_MNEMONIC, TEST_PASSWORD)
 
     addrs = accountSvc.derive_address(accountName, 2)
-
     coinSelection = transactionSvc.select_utxos(accountName, '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49', 100000)
-    FEE = transactionSvc.estimate_fees()
+    FEE = 500
     
     gdkAPI = GdkAPI(session)
     psetb64 = transactionSvc.create_empty_pset()
@@ -78,22 +78,24 @@ async def test_send_pset():
 
     b64 = wally.psbt_to_base64(pset, 0)
     blinded = transactionSvc.blind_pset(b64)
-    print(blinded)
     signed = transactionSvc.sign_pset(blinded)
     assert signed is not None
     
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="not supported by gdk yet, 'Tx contains unauthorized asset'")
+# @pytest.mark.skip(reason="not supported by gdk yet, 'Tx contains unauthorized asset'")
 async def test_send_amp_confidential_pset():
+    accountName = 'mainAccountTest'
+    ampAccountName = 'ampAccountTest'
     session = make_session('testnet-liquid')
     walletSvc = WalletService(session, FilePinDataRepository('pin_data.json'))
-    # walletSvc.create_wallet(TEST_MNEMONIC, TEST_PASSWORD)
-    walletSvc.login_with_pin(TEST_PASSWORD)
+    walletSvc.create_wallet(TEST_MNEMONIC, TEST_PASSWORD)
+    # walletSvc.login_with_pin(TEST_PASSWORD)
     lockerSvc = await Locker.create()
+    accountSvc = AccountService(session, lockerSvc)
     transactionSvc = TransactionService(session, lockerSvc)
 
-    fees_selection = transactionSvc.select_utxos('amp', '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49', 1000)
-    amp_selection = transactionSvc.select_utxos('amp', 'bea126b86ac7f7b6fc4709d1bb1a8482514a68d35633a5580d50b18504d5c322', 1)
+    fees_selection = transactionSvc.select_utxos(accountName, '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49', 1000)
+    amp_selection = transactionSvc.select_utxos(ampAccountName, 'bea126b86ac7f7b6fc4709d1bb1a8482514a68d35633a5580d50b18504d5c322', 1)
 
     utxo = amp_selection.utxos[0]
     fee_utxo = fees_selection.utxos[0]
@@ -128,12 +130,11 @@ async def test_send_amp_confidential_pset():
 
     b64 = wally.psbt_to_base64(pset, 0)
     blinded = transactionSvc.blind_pset(b64)
-    print(blinded)
+    b64 = wally.psbt_to_base64(pset, 0)
     signed = transactionSvc.sign_pset(blinded)    
 
     if not wally.psbt_finalize(signed) == wally.WALLY_OK:
         raise Exception('Failed to finalize PSBT')
     
     tx = wally.psbt_extract(signed)
-    
     

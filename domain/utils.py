@@ -54,6 +54,27 @@ def add_input_utxo(gdk_api: GdkAPI, psbtb64: str, utxo: GdkUtxo) -> str:
     funding_tx = tx_from_hex(funding_tx_hex, WALLY_TX_FLAG_USE_ELEMENTS)
     psbt_set_input_witness_utxo_from_tx(psbt, idx, funding_tx, utxo['pt_idx'])
     psbt_set_input_utxo_rangeproof(psbt, idx, tx_get_output_rangeproof(funding_tx, utxo['pt_idx']))
+
+    # Redeemscript
+    pubkey = hex_to_bytes(utxo['public_key']) if 'public_key' in utxo else None
+    if utxo['address_type'] in ['csv', 'p2wsh']:
+        # Note: 'p2wsh' for multisig is p2sh wrapped p2wsh.
+        # For Green multisig swaps, Green server signing currently requires
+        # that swap inputs are *provably* segwit in order to eliminate
+        # malleation from the processing state machine.
+        # For p2sh wrapped inputs, this currently requires passing
+        # the witness program as the redeem script when signing; The server
+        # uses this to validate the input before signing with the actual
+        # script.
+        # TODO: This isn't documented in the gdk or backend API docs, and
+        # should probably be done with a PSET input extension field instead.
+        script = hex_to_bytes(utxo['script'])
+        script = witness_program_from_bytes(script, WALLY_SCRIPT_SHA256)
+    elif utxo['address_type'] in ['p2sh-p2wpkh']:
+        script = witness_program_from_bytes(pubkey, WALLY_SCRIPT_HASH160)
+    else:
+        assert False, 'unknown address type ' + utxo['address_type']
+    
     return psbt_to_base64(psbt, 0)
 
 def h2b_rev(h: str):
