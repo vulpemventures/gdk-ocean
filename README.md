@@ -39,6 +39,12 @@ make run
 ```
 By default, the server is running on port 50051.
 
+With Python venv, you are also able to run the tests using:
+
+```
+make test
+```
+
 ## Run gdk-ocean in a Docker container
 
 Init the submodules and copy the proto stubs:
