@@ -92,7 +92,7 @@ async def test_send_amp_confidential_pset():
     lockerSvc = await Locker.create()
     accountSvc = AccountService(session, lockerSvc)
     transactionSvc = TransactionService(session, lockerSvc)
-    fees_selection = transactionSvc.select_utxos(accountName, '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49', 1000)
+    fees_selection = transactionSvc.select_utxos(accountName, '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49', 10000)
     amp_selection = transactionSvc.select_utxos(ampAccountName, 'bea126b86ac7f7b6fc4709d1bb1a8482514a68d35633a5580d50b18504d5c322', 1)
 
     utxo = amp_selection.utxos[0]

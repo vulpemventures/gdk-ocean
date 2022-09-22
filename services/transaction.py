@@ -134,22 +134,9 @@ class TransactionService:
             nonce = get_blinding_nonce(psbt, ephemeral_keys, out_index)
             blinding_nonces.append(wally.hex_from_bytes(nonce))
     
-        num_in_signed = 0
-        for i, utxo in utxos_to_sign:
-            try:
-                utxos_arr = []
-                for in_index, u in utxos_to_sign:
-                    utxos_arr.append(skipped_utxo(u.gdk_utxo) if i != in_index else u.gdk_utxo)
-                signed_result = self._gdk_api.sign_pset(psetBase64, utxos_arr, blinding_nonces)   
-                psetBase64 = signed_result['psbt']
-                num_in_signed += 1
-            except Exception as e:
-                logging.warning('Failed to sign input {}, reason: {}'.format(i, e))
-                continue
-            
-        if num_in_signed == 0:
-            raise Exception("No inputs has been signed")    
-        
+        utxos_arr = [u[1].gdk_utxo for u in utxos_to_sign]
+        signed_result = self._gdk_api.sign_pset(psetBase64, utxos_arr, blinding_nonces)   
+        psetBase64 = signed_result['psbt']
         return psetBase64
 
     def transfer(self, account_key: str, receivers: List[Receiver]) -> str:
