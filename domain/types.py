@@ -57,6 +57,8 @@ class GdkUtxo(TypedDict):
     txhash: str
     user_status: int
     skip_signing: bool
+    public_key: str
+    user_path: str
 
 class Utxo():
     def __init__(self, gdk_utxo: GdkUtxo) -> None:
