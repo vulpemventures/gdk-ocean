@@ -2,8 +2,7 @@ from binascii import hexlify
 from copy import copy
 import json
 import logging
-from typing import Dict, List, Tuple
-from xmlrpc.client import Boolean 
+from typing import Dict, List, Tuple 
 from domain.gdk import GdkAPI, TransactionDetails
 from domain.locker import Locker
 from domain.receiver import Receiver
@@ -23,13 +22,12 @@ from services.account import AccountService
 OUTPUT_ENTROPY_SIZE = 5 * 32
 
 class TransactionService:
-    def __init__(self, session: gdk.Session, locker: Locker, is_mainnet: Boolean) -> None:
+    def __init__(self, session: gdk.Session, locker: Locker) -> None:
         self._session = session
         self._gdk_api = GdkAPI(session)
         self._locker = locker
         self._account_service = AccountService(session, locker)
         self._ephemeral_priv_keys = {}
-        self._is_mainnet = is_mainnet
 
     def sign_transaction(self, txHex: str) -> str:
         pass
@@ -95,23 +93,10 @@ class TransactionService:
             prevout_script = wally.tx_output_get_script(witness_utxo)
             for a in addresses:
                 if a['blinding_script'] == wally.hex_from_bytes(prevout_script) and a['script_type'] in [14, 15]: # p2wsh, csv
-                    meaningful_script = wally.hex_to_bytes(a['script'])
-                    script = wally.witness_program_from_bytes(meaningful_script, wally.WALLY_SCRIPT_SHA256)
+                    script = wally.witness_program_from_bytes(wally.hex_to_bytes(a['script']), wally.WALLY_SCRIPT_SHA256)
                     wally.psbt_set_input_redeem_script(psbt, i, script)
-                    wally.psbt_set_input_witness_script(psbt, i, meaningful_script)
                     break
         return wally.psbt_to_base64(psbt, 0)
-     
-    def _user_key_from_utxo(self, utxo: GdkUtxo):
-        seed = bytearray(wally.BIP39_SEED_LEN_512)
-        written = wally.bip39_mnemonic_to_seed(self.session.mnemonic, None, seed)
-        seed = seed[:written]
-        version = wally.BIP32_VER_MAIN_PRIVATE if self._is_mainnet else wally.BIP32_VER_TEST_PRIVATE
-        master_extkey = wally.bip32_key_from_seed(seed, version, 0)
-        path = utxo['user_path']
-        derived_extkey = wally.bip32_key_from_parent_path(master_extkey, path, wally.BIP32_FLAG_SKIP_HASH)
-        assert wally.hex_from_bytes(wally.bip32_key_get_pub_key(derived_extkey)) == utxo['public_key']
-        return derived_extkey
      
     def sign_pset(self, psetBase64: str) -> str:
         psbt = wally.psbt_from_base64(psetBase64)
@@ -122,7 +107,6 @@ class TransactionService:
             blinding_status_guard_sign(i, out_status)
         
         psetBase64 = self._add_redeem_scripts(psetBase64)
-        psbt = wally.psbt_from_base64(psetBase64)
         print("BASE64", psetBase64)
 
         utxos = self._gdk_api.get_all_utxos()
@@ -138,17 +122,6 @@ class TransactionService:
     
         if len(utxos_to_sign) == 0:
             raise Exception("No inputs to sign")
-    
-        for input_index, utxo in utxos_to_sign:
-            print(utxo.gdk_utxo)
-            if 'public_key' in utxo.gdk_utxo:
-                pubkey = wally.hex_to_bytes(utxo.gdk_utxo['public_key'])
-                user_extkey = self._user_key_from_utxo(utxo)
-                fingerprint = wally.bip32_key_get_fingerprint(user_extkey)
-                keypaths = wally.map_keypath_public_key_init(1)
-                wally.map_keypath_add(keypaths, pubkey, fingerprint, utxo.gdk_utxo['user_path'])
-                wally.psbt_set_input_keypaths(psbt, input_index, keypaths)
-                print('______________SET PUBLIC KEY PATH_________________')
     
         blinding_nonces = []
         
