@@ -22,7 +22,6 @@ def test_create_pset():
     assert outputs_len == 0
 
 @pytest.mark.asyncio
-@pytest.mark.skip('The tx failed the testmempoolaccept call with the node')
 async def test_send_pset():
     accountName = 'mainAccountTest'
     session = make_session('testnet-liquid')
@@ -45,7 +44,7 @@ async def test_send_pset():
     lbtc = Asset.from_hex(utxo.asset).to_bytes()
     
     outputSend = wally.tx_elements_output_init(
-        unhexlify(addrs[0]['script']),
+        unhexlify(addrs[0]['blinding_script']),
         lbtc,
         wally.tx_confidential_value_from_satoshi(coinSelection.amount-FEE),
     )
@@ -58,7 +57,7 @@ async def test_send_pset():
     
     if coinSelection.change > 0:
         outputChange = wally.tx_elements_output_init(
-            unhexlify(addrs[1]['script']),
+            unhexlify(addrs[1]['blinding_script']),
             lbtc,
             wally.tx_confidential_value_from_satoshi(coinSelection.change),
         )
@@ -121,7 +120,7 @@ async def test_send_amp_confidential_pset():
     
     if fees_selection.change > 0:
         changeAddr = accountSvc.derive_address(accountName, 1)[0]
-        changeScript = changeAddr['script']
+        changeScript = changeAddr['blinding_script']
         outputChange = wally.tx_elements_output_init(
             unhexlify(changeScript),
             lbtc,
