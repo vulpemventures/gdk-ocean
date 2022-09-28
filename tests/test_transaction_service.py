@@ -78,9 +78,13 @@ async def test_send_pset():
     blinded = transactionSvc.blind_pset(b64)
     signed = transactionSvc.sign_pset(blinded)
     assert signed is not None
+
+    pset = wally.psbt_from_base64(signed)
+    wally.psbt_finalize(pset)
+    tx = wally.psbt_extract(pset)
+    assert tx is not None
     
 @pytest.mark.asyncio
-# @pytest.mark.skip(reason='["http:\/\/greenaddressit.com\/error#internal","Internal Error",{}')
 async def test_send_amp_confidential_pset():
     accountName = 'mainAccountTest'
     ampAccountName = 'ampAccountTest'
@@ -145,8 +149,8 @@ async def test_send_amp_confidential_pset():
     signed = transactionSvc.sign_pset(blinded)    
     assert signed is not None
 
-    if not wally.psbt_finalize(signed) == wally.WALLY_OK:
-        raise Exception('Failed to finalize PSBT')
-    
-    tx = wally.psbt_extract(signed)
+    pset = wally.psbt_from_base64(signed)
+    wally.psbt_finalize(pset)
+    tx = wally.psbt_extract(pset)
+    assert tx is not None
     
