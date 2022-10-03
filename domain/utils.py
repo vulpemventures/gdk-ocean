@@ -2,7 +2,7 @@ from binascii import unhexlify
 from wallycore import *
 
 from domain.gdk import GdkAPI
-from domain.types import GdkUtxo
+from domain.types import GdkUtxo, h2b_rev
 
 CONFIDENTIAL_PREFIXES = [0x0a, 0x0b]
 UNCONFIDENTIAL_PREFIX = 0x01
@@ -49,11 +49,12 @@ def add_input_utxo(gdk_api: GdkAPI, psbtb64: str, utxo: GdkUtxo) -> str:
     # Add the input to the psbt
     idx = psbt_get_num_inputs(psbt)
     seq = 0xFFFFFFFE  # RBF not enabled for liquid yet
-    psbt_add_tx_input_at(psbt, idx, 0, tx_input_init(h2b_rev(utxo['txhash']), utxo['pt_idx'], seq, None, None))
     funding_tx_hex = gdk_api.get_transaction_hex(utxo['txhash'])
     funding_tx = tx_from_hex(funding_tx_hex, WALLY_TX_FLAG_USE_ELEMENTS)
+    proof = tx_get_output_rangeproof(funding_tx, utxo['pt_idx'])
+    psbt_add_tx_input_at(psbt, idx, 0, tx_input_init(h2b_rev(utxo['txhash']), utxo['pt_idx'], seq, None, None))
     psbt_set_input_witness_utxo_from_tx(psbt, idx, funding_tx, utxo['pt_idx'])
-    psbt_set_input_utxo_rangeproof(psbt, idx, tx_get_output_rangeproof(funding_tx, utxo['pt_idx']))
+    psbt_set_input_utxo_rangeproof(psbt, idx,  proof)
 
     # Redeemscript
     pubkey = hex_to_bytes(utxo['public_key']) if 'public_key' in utxo else None
@@ -77,5 +78,3 @@ def add_input_utxo(gdk_api: GdkAPI, psbtb64: str, utxo: GdkUtxo) -> str:
 
     return psbt_to_base64(psbt, 0)
 
-def h2b_rev(h: str):
-    return hex_to_bytes(h)[::-1]

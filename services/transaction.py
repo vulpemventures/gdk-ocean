@@ -1,15 +1,14 @@
-from binascii import hexlify
+from binascii import hexlify, unhexlify
 from copy import copy
-import json
-import logging
-from typing import Dict, List, Tuple 
+from typing import List, Tuple, TypedDict 
 from domain.gdk import GdkAPI, TransactionDetails
 from domain.locker import Locker
 from domain.receiver import Receiver
-from domain.types import CoinSelectionResult, GdkUtxo, InputBlindingData, Outpoint, Utxo 
+from domain.types import CoinSelectionResult, GdkUtxo, InputBlindingData, Outpoint, PsetInputArgs, PsetOutputArgs, Utxo 
 import greenaddress as gdk
 import wallycore as wally
 import secrets
+from domain.utils import Asset
 
 from services.account import AccountService
 
@@ -20,6 +19,9 @@ from services.account import AccountService
 # - Explicit value rangeproof
 # - Surjectionproof seed
 OUTPUT_ENTROPY_SIZE = 5 * 32
+
+def h2b_rev(h: str):
+    return wally.hex_to_bytes(h)[::-1]
 
 class TransactionService:
     def __init__(self, session: gdk.Session, locker: Locker) -> None:
@@ -42,15 +44,65 @@ class TransactionService:
         }
         return self._session.psbt_get_details(details).resolve()
 
-    # TODO: rename to create_pset and accept lists of ins and outs as args.
-    def create_empty_pset(self) -> str:
-        pset = wally.psbt_init(2, 0, 0, 0, wally.WALLY_PSBT_INIT_PSET)
-        # TODO: Add ins
-        # TODO: Add ins witness utxos
-        # TODO: Add ins utxo rangeproofs
-        # TODO: Add ins redeem scripts for csv and p2wsh
-        # TODO: Add outputs (+ blinding pub key + blinder index)
+    def _add_input_to_pset(self, psetb64: str, psetInput: PsetInputArgs) -> str:
+        """add an input to a pset at the next available index, add witnessUtxo, utxoRangeproof and redeemScript if needed
+
+        Args:
+            psetb64 (str): the pset to add input to
+            psetInput (PsetInput): the input to add
+
+        Returns:
+            str: pset with input added as base64
+        """
+        pset = wally.psbt_from_base64(psetb64)
+        # Add the input to the psbt
+        idx = wally.psbt_get_num_inputs(pset)
+        seq = 0xFFFFFFFE  # RBF not enabled for liquid yet
+        wally.psbt_add_tx_input_at(pset, idx, 0, wally.tx_input_init(h2b_rev(psetInput['txhash']), psetInput['vout'], seq, None, None))
+        funding_tx_hex = self._gdk_api.get_transaction_hex(psetInput['txhash'])
+        funding_tx = wally.tx_from_hex(funding_tx_hex, wally.WALLY_TX_FLAG_USE_ELEMENTS)
+        wally.psbt_set_input_witness_utxo_from_tx(pset, idx, funding_tx, psetInput['vout'])
+        wally.psbt_set_input_utxo_rangeproof(pset, idx, wally.tx_get_output_rangeproof(funding_tx, psetInput['vout']))
+
         return wally.psbt_to_base64(pset, 0)
+
+    def _add_output_to_pset(self, psetb64: str, psetOutput: PsetOutputArgs) -> str:
+        pset = wally.psbt_from_base64(psetb64)
+        script = None
+        blindingPubKey = None
+        
+        if psetOutput['address'] is not None:
+            decoded_addr = decode_address(psetOutput['address'])
+            script = wally.hex_to_bytes(decoded_addr['scriptPubKey'])
+            blindingPubKey = wally.hex_to_bytes(decoded_addr['blindingPubKey'])
+        
+        output = wally.tx_elements_output_init(
+            script,
+            Asset.from_hex(psetOutput['asset']).to_bytes(),
+            wally.tx_confidential_value_from_satoshi(psetOutput['amount']),
+        )
+        
+        idx = wally.psbt_get_num_outputs(pset)
+        wally.psbt_add_tx_output_at(pset, idx, 0, output)
+        
+        if psetOutput['blinder_index'] is not None:
+            wally.psbt_set_output_blinder_index(pset, idx, psetOutput['blinder_index'])
+        if blindingPubKey is not None:
+            wally.psbt_set_output_blinding_public_key(pset, idx, blindingPubKey)
+            
+        return wally.psbt_to_base64(pset, 0)
+
+    def _empty_pset(self) -> str:
+        pset = wally.psbt_init(2, 0, 0, 0, wally.WALLY_PSBT_INIT_PSET)
+        return wally.psbt_to_base64(pset, 0)
+
+    def create_pset(self, ins: List[PsetInputArgs], outs: List[PsetOutputArgs]) -> str:
+        pset = self._empty_pset()
+        for inp in ins:
+            pset = self._add_input_to_pset(pset, inp)
+        for out in outs:
+            pset = self._add_output_to_pset(pset, out)
+        return pset
 
     def blind_pset(self, psetBase64: str) -> str:
         psbt = wally.psbt_from_base64(psetBase64)
@@ -72,7 +124,7 @@ class TransactionService:
             out_blinder_index = wally.psbt_get_output_blinder_index(psbt, i)
             if out_blinder_index in blinder_indexes_to_blind:
                 if wally.psbt_get_output_blinding_public_key_len(psbt, i) == 0:
-                    continue # skip the outputs without blinding public key
+                    raise Exception('output blinding pubkey not set but has blinder index')
                 num_outputs_to_blind += 1
 
         entropy = secrets.token_bytes(num_outputs_to_blind * 5 * 32)
@@ -107,7 +159,6 @@ class TransactionService:
             blinding_status_guard_sign(i, out_status)
         
         psetBase64 = self._add_redeem_scripts(psetBase64)
-        print("BASE64", psetBase64)
 
         utxos = self._gdk_api.get_all_utxos()
         utxos_to_sign: List[Tuple[int, Utxo]] = []
@@ -211,3 +262,44 @@ def get_blinding_nonce(psbt, ephemeral_keys, output_index):
     ephemeral_key = wally.map_get_item(ephemeral_keys, output_index)
     blinding_pubkey = wally.psbt_get_output_blinding_public_key(psbt, output_index)
     return wally.ecdh_nonce_hash(blinding_pubkey, ephemeral_key)
+
+def h2b_rev(h: str):
+    return wally.hex_to_bytes(h)[::-1]
+
+
+class AnalyzeAddressResult(TypedDict):
+    network: str
+    isSegwit: bool
+
+def analyze_address(address: str) -> AnalyzeAddressResult:
+    """Returns the network from the address (regtest not supported)"""
+    if address.startswith('lq'):
+        return { 'network': 'liquid', 'isSegwit': True }
+    if address.startswith('tlq'):
+        return { 'network': 'liquidtestnet', 'isSegwit': True }
+    
+    decoded = wally.base58check_to_bytes(address)
+    if (decoded[0] == wally.WALLY_CA_PREFIX_LIQUID_TESTNET):
+        return {'network': 'liquidtestnet', 'isSegwit': False }
+    if (decoded[0] == wally.WALLY_CA_PREFIX_LIQUID):
+        return {'network': 'liquid', 'isSegwit': False }
+    
+    raise Exception('Unknown network for address ' + address)
+
+class DecodeAddressResult(TypedDict):
+    scriptPubKey: str
+    blindingPubKey: str
+
+def decode_address(address: str) -> DecodeAddressResult:
+    analyzer_result = analyze_address(address)
+    unconf_addr = None
+    try:
+        unconf_addr = wally.confidential_addr_to_addr(address, wally.WALLY_CA_PREFIX_LIQUID if analyzer_result['network'] == 'liquid' else wally.WALLY_CA_PREFIX_LIQUID_TESTNET)
+    except:
+        unconf_addr = address
+    scriptpubkey = wally.address_to_scriptpubkey(unconf_addr, wally.WALLY_NETWORK_LIQUID if analyzer_result['network'] == 'liquid' else wally.WALLY_NETWORK_LIQUID_TESTNET)
+    blindingPubKey = wally.confidential_addr_to_ec_public_key(address, wally.WALLY_CA_PREFIX_LIQUID if analyzer_result['network'] == 'liquid' else wally.WALLY_CA_PREFIX_LIQUID_TESTNET)
+    return {
+        'scriptPubKey': wally.hex_from_bytes(scriptpubkey),
+        'blindingPubKey': wally.hex_from_bytes(blindingPubKey)
+    }

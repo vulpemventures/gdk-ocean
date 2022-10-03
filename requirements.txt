@@ -1,6 +1,6 @@
 google==3.0.0
 # greenaddress @ https://github.com/Blockstream/gdk/releases/download/release_0.0.55/greenaddress-0.0.55-cp39-cp39-linux_x86_64.whl
-./greenaddress-0.0.55-cp39-cp39-linux_x86_64.whl
+./greenaddress-0.0.56-cp39-cp39-linux_x86_64.whl
 grpcio==1.43.0
 grpcio-tools==1.43.0
 protobuf==3.19.3

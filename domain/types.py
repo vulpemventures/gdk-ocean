@@ -1,6 +1,18 @@
-from typing import TypedDict, List
+from typing import Optional, TypedDict, List
 from ocean.v1alpha import types_pb2
 import wallycore as wally
+
+class PsetInputArgs(TypedDict):
+    txhash: str
+    vout: int
+    script: str
+    address_type: str
+    
+class PsetOutputArgs(TypedDict):
+    address: Optional[str]
+    amount: int
+    asset: str
+    blinder_index: Optional[int]
 
 class AccountKey():
     def __init__(self, name: str, account_id: int) -> None:
@@ -107,6 +119,14 @@ class Utxo():
             'input_index': input_index,
         }
     
+    def to_pset_input_args(self) -> PsetInputArgs:
+        return {
+            'address_type': self.gdk_utxo['address_type'],
+            'script': self.script,
+            'txhash': self.txid,
+            'vout': self.index,
+        }
+    
     def to_string(self) -> str:
         return f'{self.txid}:{self.index} (asset: {self.asset}, value: {self.value}, isConfidential: {self.confidential})'
     
@@ -137,3 +157,4 @@ class CoinSelectionResult():
 
 def h2b_rev(hexstr: str) -> bytes:
     return wally.hex_to_bytes(hexstr)[::-1]
+
