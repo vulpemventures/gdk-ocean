@@ -1,10 +1,8 @@
 import asyncio
 import logging
+
 from typing import Dict, Set, List
 from domain import BaseNotification, TxConfirmedNotification, UtxoSpentNotification, UtxoUnspecifiedNotification, Utxo, get_block_details, GdkAPI
-import greenaddress as gdk
-from services import wallet
-
 from services.wallet import WalletService
 
 def _get_utxos_by_account(gdk_api: GdkAPI) -> Dict[str, Dict[str, List[Utxo]]]:

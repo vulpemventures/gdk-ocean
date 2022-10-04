@@ -3,7 +3,6 @@ import pytest
 
 from domain import make_session, InMemoryPinDataRepository, Locker, GdkAPI
 from services import AccountService, WalletService
-import greenaddress as gdk
 
 async def init_account_service() -> Tuple[AccountService, GdkAPI]:
     session = make_session('testnet-liquid')

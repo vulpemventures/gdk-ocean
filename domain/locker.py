@@ -2,8 +2,7 @@ import logging
 import asyncio
 from typing import Dict
 from xmlrpc.client import boolean
-from domain.notification import UtxoLockedNotification, UtxoUnlockedNotification
-from domain.types import Outpoint, Utxo
+from domain import UtxoLockedNotification, UtxoUnlockedNotification, Outpoint, Utxo
 from typing import List
 import time
 

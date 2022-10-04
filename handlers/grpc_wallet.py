@@ -1,5 +1,5 @@
-from ocean.v1alpha import wallet_pb2, wallet_pb2_grpc
-from services.wallet import WalletService
+from ocean.v1 import wallet_pb2, wallet_pb2_grpc
+from services import WalletService
 
 class GrpcWalletServicer(wallet_pb2_grpc.WalletServiceServicer):
     def __init__(self, walletService: WalletService):

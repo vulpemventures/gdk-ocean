@@ -1,10 +1,6 @@
-from domain.address_details import AddressDetails
-from domain.gdk import GdkAPI, GdkAccountAPI
-from typing import Dict, List
-
 import greenaddress as gdk
-from domain.locker import Locker
-from domain.types import Outpoint, Utxo
+from domain import AddressDetails, GdkAPI, GdkAccountAPI, Locker, Outpoint, Utxo
+from typing import Dict, List
 
 class AccountService:
     def __init__(self, session: gdk.Session, locker: Locker):

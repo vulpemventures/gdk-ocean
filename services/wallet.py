@@ -1,7 +1,6 @@
 import logging
 import greenaddress as gdk
-from domain.gdk import GdkAPI
-from domain.pin_data_repository import PinDataRepositoryInterface
+from domain import GdkAPI, PinDataRepositoryInterface
 
 class WalletService:
     def __init__(self, session: gdk.Session, pin_data_repo: PinDataRepositoryInterface) -> None:

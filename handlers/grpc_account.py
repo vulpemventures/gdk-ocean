@@ -1,7 +1,7 @@
 from ast import Dict
-from domain import Outpoint, make_utxos_list_proto
 from services import AccountService
-from ocean.v1alpha import account_pb2, account_pb2_grpc, types_pb2
+from domain import Outpoint, make_utxos_list_proto
+from ocean.v1 import account_pb2, account_pb2_grpc, types_pb2
 
 class GrpcAccountServicer(account_pb2_grpc.AccountServiceServicer):
     def __init__(self, accountService: AccountService) -> None:

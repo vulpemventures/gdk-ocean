@@ -2,7 +2,7 @@ import logging
 from typing import Tuple
 import click
 import grpc
-from ocean.v1alpha import wallet_pb2_grpc, wallet_pb2, account_pb2_grpc, account_pb2, types_pb2, transaction_pb2_grpc, transaction_pb2, notification_pb2, notification_pb2_grpc
+from ocean import v1 as proto
 
 # AccountKey class is a duplicate version of AccountKey class in domain/account_key.py
 # it lets to run the cli without the domain package (and thus without the dependencies)
@@ -15,16 +15,16 @@ class AccountKey():
     def from_name(cls, name: str) -> 'AccountKey':
         return cls(name, 0)
 
-def _get_wallet_stub_from_context(ctx: click.Context) -> wallet_pb2_grpc.WalletServiceStub:
+def _get_wallet_stub_from_context(ctx: click.Context) -> proto.WalletServiceStub:
     return ctx.obj['wallet']
 
-def _get_account_stub_from_context(ctx: click.Context) -> account_pb2_grpc.AccountServiceStub:
+def _get_account_stub_from_context(ctx: click.Context) -> proto.AccountServiceStub:
     return ctx.obj['account']
 
-def _get_transaction_stub_from_context(ctx: click.Context) -> transaction_pb2_grpc.TransactionServiceStub:
+def _get_transaction_stub_from_context(ctx: click.Context) -> proto.TransactionServiceStub:
     return ctx.obj['transaction']
 
-def _get_notification_stub_from_context(ctx: click.Context) -> notification_pb2_grpc.NotificationServiceStub:
+def _get_notification_stub_from_context(ctx: click.Context) -> proto.NotificationServiceStub:
     return ctx.obj['notification']
 
 def parse_address(address: str) -> Tuple[str, int]:
@@ -46,10 +46,10 @@ def cli(ctx: click.Context, debug: bool, address: str):
     """
     host, port = parse_address(address)
     channel = grpc.insecure_channel(f'{host}:{port}')
-    wallet_svc = wallet_pb2_grpc.WalletServiceStub(channel)
-    account_svc = account_pb2_grpc.AccountServiceStub(channel)
-    transaction_svc = transaction_pb2_grpc.TransactionServiceStub(channel)
-    notifications_svc = notification_pb2_grpc.NotificationServiceStub(channel)
+    wallet_svc = proto.WalletServiceStub(channel)
+    account_svc = proto.AccountServiceStub(channel)
+    transaction_svc = proto.TransactionServiceStub(channel)
+    notifications_svc = proto.NotificationServiceStub(channel)
     
     ctx.ensure_object(dict)
 

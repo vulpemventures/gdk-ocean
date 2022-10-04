@@ -15,7 +15,7 @@ RUN pip install -r requirements.txt
 COPY domain ./domain
 COPY handlers ./handlers
 COPY services ./services
-COPY ocean/v1alpha ./ocean/v1alpha
+COPY ocean/v1 ./ocean/v1
 COPY gdk-ocean.py ./gdk-ocean.py
 
 # run the main file

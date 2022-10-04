@@ -1,6 +1,5 @@
 stubs:
-	rm -rf ocean
-	cp -r specs/api-spec/protobuf/gen/python/ocean ocean
+	buf generate buf.build/vulpemventures/ocean
 
 env:
 	python3.9 -m venv venv

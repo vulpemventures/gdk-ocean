@@ -1,9 +1,9 @@
 import asyncio
 import logging
 from typing import Dict, List
-from domain.notification import BaseNotification, NotificationType
-from ocean.v1alpha import notification_pb2, notification_pb2_grpc
-from services.notifications import NotificationsService
+from domain import BaseNotification, NotificationType
+from ocean.v1 import notification_pb2, notification_pb2_grpc
+from services import NotificationsService
 
 class _Subscriber():
     def __init__(self, subscribe_to: List[NotificationType]) -> None:

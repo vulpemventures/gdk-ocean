@@ -2,10 +2,8 @@ import http
 import json
 from typing import Dict, List, Tuple, TypedDict
 import greenaddress as gdk
-from domain.address_details import AddressDetails
 from domain.pin_data_repository import PinData
-from domain.receiver import Receiver, receiver_to_dict
-from domain.types import BlockDetails, GdkUtxo, Utxo
+from domain.types import AddressDetails, BlockDetails, GdkUtxo, Receiver, Utxo, receiver_to_dict
 
 class AccountDetails(TypedDict):
     name: str

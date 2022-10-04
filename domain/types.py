@@ -1,5 +1,7 @@
-from typing import Optional, TypedDict, List
-from ocean.v1alpha import types_pb2
+from binascii import unhexlify
+from enum import Enum
+from typing import Any, Optional, TypedDict, List
+from ocean.v1 import notification_pb2, types_pb2
 import wallycore as wally
 
 class PsetInputArgs(TypedDict):
@@ -13,34 +15,6 @@ class PsetOutputArgs(TypedDict):
     amount: int
     asset: str
     blinder_index: Optional[int]
-
-class AccountKey():
-    def __init__(self, name: str, account_id: int) -> None:
-        self.name = name
-        self.id = account_id
-        
-    @classmethod
-    def from_name(cls, name: str) -> 'AccountKey':
-        return cls(name, 0)
-    
-    def to_proto(self) -> types_pb2.AccountKey:
-        return types_pb2.AccountKey(
-            name=self.name,
-            id=self.id,
-        )
-
-class BlockDetails():
-    def __init__(self, block_hash: str, block_height: int, block_time: int):
-        self.block_hash = block_hash
-        self.block_height = block_height
-        self.block_time = block_time
-    
-    def to_proto(self) -> types_pb2.BlockDetails:
-        return types_pb2.BlockDetails(
-            hash=bytes.fromhex(self.block_hash),
-            height=self.block_height,
-            timestamp=self.block_time,
-        )
 
 class InputBlindingData(TypedDict):
     asset_blinder: bytes
@@ -131,8 +105,8 @@ class Utxo():
         return f'{self.txid}:{self.index} (asset: {self.asset}, value: {self.value}, isConfidential: {self.confidential})'
     
 def make_utxos_list_proto(account_name: str, utxos: List[Utxo]) -> types_pb2.Utxos:
-    return types_pb2.UtxosList(
-        account_key=AccountKey.from_name(account_name).to_proto(),
+    return types_pb2.Utxos(
+        account_key=account_name,
         utxos=[utxo.to_proto() for utxo in utxos]
     )
 
@@ -158,3 +132,177 @@ class CoinSelectionResult():
 def h2b_rev(hexstr: str) -> bytes:
     return wally.hex_to_bytes(hexstr)[::-1]
 
+
+class BlockDetails():
+    def __init__(self, block_hash: str, block_height: int, block_time: int):
+        self.block_hash = block_hash
+        self.block_height = block_height
+        self.block_time = block_time
+
+class AddressDetails(TypedDict):
+    address: str
+    address_type: str
+    branch: int
+    pointer: int
+    script: str
+    script_type: int
+    subaccount: int
+    subtype: int
+    blinding_key: str
+    blinding_script: str
+    is_blinded: bool
+    unblinded_address: str
+
+class Receiver(TypedDict):
+    address: str
+    sats: int
+    asset: str
+
+def receiver_to_dict(receiver: Receiver) -> dict:
+    """
+    This function is used to convert a receiver to a dictionary.
+    """
+    return {
+        'address': receiver['address'],
+        'satoshi': receiver['sats'],
+        'asset_id': receiver['asset'],
+    }
+    
+class NotificationType(Enum):
+    UTXO_SPENT = 0
+    UTXO_LOCKED = 1
+    UTXO_UNLOCKED = 2
+    UTXO_UNSPECIFIED = 3
+    
+    TX_BROADCASTED = 4
+    TX_CONFIRMED = 5
+    TX_UNCONFIRMED = 6
+    TX_UNSPECIFIED = 7
+
+class BaseNotification():
+    def __init__(self) -> None:
+        self.type: NotificationType = None
+        
+    def to_proto(self) -> Any:
+        raise Exception('to_proto method must be implemented by a child notification class')
+    
+class UtxoNotification(BaseNotification):
+    def __init__(self, n_type: NotificationType, utxo: Utxo, account_name: str):
+        self.type = n_type
+        self.utxo = utxo
+        self.account = account_name
+        
+    def _type_to_tx_event_type(self) -> types_pb2.UtxoEventType:
+        if self.type is NotificationType.UTXO_SPENT:
+            return types_pb2.UTXO_EVENT_TYPE_SPENT
+        elif self.type is NotificationType.UTXO_LOCKED:
+            return types_pb2.UTXO_EVENT_TYPE_LOCKED
+        elif self.type is NotificationType.UTXO_UNSPECIFIED:
+            return types_pb2.UTXO_EVENT_TYPE_UNSPECIFIED
+        elif self.type is NotificationType.UTXO_UNLOCKED:
+            return types_pb2.UTXO_EVENT_TYPE_UNLOCKED
+        else:
+            raise Exception(f"Unknown utxo event type: {self.type}")
+    
+    def to_proto(self) :
+        utxo_proto = self.utxo.to_proto()
+        account_proto = self.account.to_proto()
+        return notification_pb2.UtxosNotificationsResponse(
+            account_key=account_proto,
+            utxo=utxo_proto,
+            event_type=self._type_to_tx_event_type()
+        )
+    
+class UtxoSpentNotification(UtxoNotification):
+    def __init__(self, utxo: Utxo, account_name: str):
+        super().__init__(NotificationType.UTXO_SPENT, utxo, account_name)
+        
+class UtxoUnspecifiedNotification(UtxoNotification):
+    def __init__(self, utxo: Utxo, account_name: str):
+        super().__init__(NotificationType.UTXO_UNSPECIFIED, utxo, account_name)
+    
+class UtxoLockedNotification(UtxoNotification):
+    def __init__(self, data: Utxo, account_name: str):
+        super().__init__(NotificationType.UTXO_LOCKED, data, account_name)
+
+class UtxoUnlockedNotification(UtxoNotification):
+    def __init__(self, utxo: Utxo, account_name: str):
+        super().__init__(NotificationType.UTXO_UNLOCKED, utxo, account_name)
+
+class TxNotification(BaseNotification):
+    def __init__(self, n_type: NotificationType, txid: str, block_details: BlockDetails, account_name: str):
+        self.type = n_type
+        self.txid = txid
+        self.block_details = block_details
+        self.account = account_name
+    
+    def _type_to_tx_event_type(self) -> types_pb2.TxEventType:
+        if self.type is NotificationType.TX_CONFIRMED:
+            return types_pb2.TX_EVENT_TYPE_CONFIRMED
+        elif self.type is NotificationType.TX_UNCONFIRMED:
+            return types_pb2.TX_EVENT_TYPE_UNCONFIRMED
+        elif self.type is NotificationType.TX_UNSPECIFIED:
+            return types_pb2.TX_EVENT_TYPE_UNSPECIFIED
+        elif self.type is NotificationType.TX_BROADCASTED:
+            return types_pb2.TX_EVENT_TYPE_BROADCASTED
+        else:
+            raise Exception(f"Unknown tx event type: {self.type}")
+    
+    def to_proto(self) -> notification_pb2.TransactionNotificationsResponse:
+        return notification_pb2.TransactionNotificationsResponse(
+            txid=self.txid,
+            event_type=self._type_to_tx_event_type(),
+            block_details=self.block_details.to_proto(),
+            account_key=self.account.to_proto(),
+        )
+        
+class TxConfirmedNotification(TxNotification):
+    def __init__(self, txid: str, block_details: BlockDetails, account_name: str):
+        super().__init__(NotificationType.TX_CONFIRMED, txid, block_details, account_name)
+    
+class TxUnconfirmedNotification(TxNotification):
+    def __init__(self, txid: str, block_details: BlockDetails, account_name: str):
+        super().__init__(NotificationType.TX_UNCONFIRMED, txid, block_details, account_name)
+
+class TxUnspecifiedNotification(TxNotification):
+    def __init__(self, txid: str, block_details: BlockDetails, account_name: str):
+        super().__init__(NotificationType.TX_UNSPECIFIED, txid, block_details, account_name)
+
+CONFIDENTIAL_PREFIXES = [0x0a, 0x0b]
+UNCONFIDENTIAL_PREFIX = 0x01
+
+class Asset:
+    def __init__(self, prefix: int, value: bytes):
+        self.prefix = prefix
+        self.value = value
+
+    @classmethod
+    def from_bytes(self, b: bytes) -> 'Asset':
+        if len(b) == 32:
+            return Asset(UNCONFIDENTIAL_PREFIX, b)
+
+        if len(b) == 33:
+            prefix = b[0]
+            if prefix not in CONFIDENTIAL_PREFIXES.extend(UNCONFIDENTIAL_PREFIX):
+                raise ValueError('Invalid prefix')
+            return Asset(prefix, b[1:])
+
+        raise ValueError('Invalid asset length (must be 32 or 33 bytes)')
+
+    @classmethod
+    def from_hex(self, hex_asset: str) -> 'Asset':
+        if len(hex_asset) == 64:
+            value = unhexlify(hex_asset)
+            return Asset.from_bytes(value[::-1])
+
+        if len(hex_asset) == 66:
+            value = unhexlify(hex_asset[1:])
+            prefix = value[0]
+            value = value[1:]
+            return Asset.from_bytes(prefix + value[::-1])
+
+    def to_bytes(self) -> bytes:
+        return bytes([self.prefix]) + bytes(self.value)
+
+    def to_bytes_without_prefix(self) -> bytearray:
+        return bytearray(self.value)

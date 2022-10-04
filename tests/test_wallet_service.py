@@ -1,5 +1,5 @@
 import pytest
-from services.wallet import WalletService
+from services import WalletService
 from domain import make_session, InMemoryPinDataRepository
 
 @pytest.fixture
