@@ -34,7 +34,8 @@ make run
 ```
 By default, the server is running on port 50051.
 
-With Python venv, you are also able to run the tests using:
+With Python venv, you are also able to run the tests using.
+As the integration tests are running on testnet network, you have to set up the `TESTNET_TEST_MNEMONIC` env variable with a valid mnemonic owning some testnet L-BTC and AMP test asset.
 
 ```
 make test
