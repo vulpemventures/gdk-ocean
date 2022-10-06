@@ -197,9 +197,7 @@ class GdkAPI:
             account_utxos = account.utxos()
             for _, utxos in account_utxos.items():
                 result.extend(utxos)
-                
-        
-        return [Utxo(utxo) for utxo in self.get_all_unspents_outputs()]
+        return result
 
     def sign_pset(self, psetBase64: str, utxos: List[GdkUtxo], blinding_nonces: List) -> SignPsetResult:        
         details = {
