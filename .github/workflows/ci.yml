@@ -1,0 +1,27 @@
+name: Pytest CI
+
+on: 
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.9
+    - name: Make venv
+      run: make env
+    - name: Activate env
+      run: source ./venv/bin/activate
+    - name: Install dependencies
+      run: make deps
+    - name: Run tests
+      env:
+        TESTNET_TEST_MNEMONIC: ${{ secrets.TESTNET_TEST_MNEMONIC }}
+      run: make test-ci
