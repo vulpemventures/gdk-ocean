@@ -260,7 +260,10 @@ def skipped_utxo(u: GdkUtxo) -> GdkUtxo:
     return cpy
 
 def get_blinding_nonce(psbt, ephemeral_keys, output_index):
-    ephemeral_key = wally.map_get_item(ephemeral_keys, output_index)
+    ephemeral_key_index = wally.map_find_integer(ephemeral_keys, output_index)
+    if not ephemeral_key_index:
+        raise Exception('Output ' + str(output_index) + ' blinding key not found')
+    ephemeral_key = wally.map_get_item(ephemeral_keys, ephemeral_key_index - 1)
     blinding_pubkey = wally.psbt_get_output_blinding_public_key(psbt, output_index)
     return wally.ecdh_nonce_hash(blinding_pubkey, ephemeral_key)
 
