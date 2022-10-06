@@ -138,7 +138,7 @@ class TransactionService:
             if wally.psbt_get_output_script_len(psbt, i) == 0:
                 continue # skip the fee outputs
             out_blinder_index = wally.psbt_get_output_blinder_index(psbt, i)
-            if out_blinder_index in blinder_indexes_to_blind:
+            if out_blinder_index in blinder_indexes_to_blind and wally.psbt_get_output_blinding_public_key_len(psbt, i) != 0:
                 if wally.psbt_get_output_blinding_public_key_len(psbt, i) == 0:
                     raise Exception('output blinding pubkey not set but has blinder index')
                 num_outputs_to_blind += 1
