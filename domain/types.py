@@ -45,7 +45,7 @@ class GdkUtxo(TypedDict):
     skip_signing: bool
 
 class Utxo():
-    def __init__(self, gdk_utxo: GdkUtxo) -> None:
+    def __init__(self, gdk_utxo: GdkUtxo, account: str) -> None:
         self.gdk_utxo = gdk_utxo
         self.txid = gdk_utxo['txhash']
         self.index = gdk_utxo['pt_idx']
@@ -59,6 +59,7 @@ class Utxo():
         self.value_blinder = gdk_utxo['amountblinder']
         self.confidential = gdk_utxo['confidential']
         self.is_confirmed = True
+        self.account = account
         self._validate()
     
     def _validate(self) -> None:
@@ -73,17 +74,6 @@ class Utxo():
             if self.value_blinder == zeros:
                 raise Exception('Value blinder is null for confidential utxo')
 
-    def to_proto(self, is_locked: bool) -> types_pb2.Utxo:
-        return types_pb2.Utxo(
-            txid=self.txid,
-            index=self.index,
-            asset=self.asset,
-            value=self.value,
-            script=bytes.fromhex(self.script),
-            is_confirmed=self.is_confirmed,
-            is_locked=is_locked,
-        )
-    
     def to_blinding_data(self, input_index: int) -> InputBlindingData:
         return {
             'asset_blinder': h2b_rev(self.asset_blinder),
@@ -104,12 +94,6 @@ class Utxo():
     def to_string(self) -> str:
         return f'{self.txid}:{self.index} (asset: {self.asset}, value: {self.value}, isConfidential: {self.confidential})'
     
-def make_utxos_list_proto(account_name: str, utxos: List[Utxo]) -> types_pb2.Utxos:
-    return types_pb2.Utxos(
-        account_key=account_name,
-        utxos=[utxo.to_proto() for utxo in utxos]
-    )
-
 class Outpoint():
     def __init__(self, txid: str, index: int):
         self.txid = txid
@@ -183,36 +167,12 @@ class BaseNotification():
     def __init__(self) -> None:
         self.type: NotificationType = None
         
-    def to_proto(self) -> Any:
-        raise Exception('to_proto method must be implemented by a child notification class')
-    
 class UtxoNotification(BaseNotification):
     def __init__(self, n_type: NotificationType, utxo: Utxo, account_name: str):
         self.type = n_type
         self.utxo = utxo
         self.account = account_name
         
-    def _type_to_tx_event_type(self) -> types_pb2.UtxoEventType:
-        if self.type is NotificationType.UTXO_SPENT:
-            return types_pb2.UTXO_EVENT_TYPE_SPENT
-        elif self.type is NotificationType.UTXO_LOCKED:
-            return types_pb2.UTXO_EVENT_TYPE_LOCKED
-        elif self.type is NotificationType.UTXO_UNSPECIFIED:
-            return types_pb2.UTXO_EVENT_TYPE_UNSPECIFIED
-        elif self.type is NotificationType.UTXO_UNLOCKED:
-            return types_pb2.UTXO_EVENT_TYPE_UNLOCKED
-        else:
-            raise Exception(f"Unknown utxo event type: {self.type}")
-    
-    def to_proto(self) :
-        utxo_proto = self.utxo.to_proto()
-        account_proto = self.account.to_proto()
-        return notification_pb2.UtxosNotificationsResponse(
-            account_key=account_proto,
-            utxo=utxo_proto,
-            event_type=self._type_to_tx_event_type()
-        )
-    
 class UtxoSpentNotification(UtxoNotification):
     def __init__(self, utxo: Utxo, account_name: str):
         super().__init__(NotificationType.UTXO_SPENT, utxo, account_name)
@@ -236,26 +196,6 @@ class TxNotification(BaseNotification):
         self.block_details = block_details
         self.account = account_name
     
-    def _type_to_tx_event_type(self) -> types_pb2.TxEventType:
-        if self.type is NotificationType.TX_CONFIRMED:
-            return types_pb2.TX_EVENT_TYPE_CONFIRMED
-        elif self.type is NotificationType.TX_UNCONFIRMED:
-            return types_pb2.TX_EVENT_TYPE_UNCONFIRMED
-        elif self.type is NotificationType.TX_UNSPECIFIED:
-            return types_pb2.TX_EVENT_TYPE_UNSPECIFIED
-        elif self.type is NotificationType.TX_BROADCASTED:
-            return types_pb2.TX_EVENT_TYPE_BROADCASTED
-        else:
-            raise Exception(f"Unknown tx event type: {self.type}")
-    
-    def to_proto(self) -> notification_pb2.TransactionNotificationsResponse:
-        return notification_pb2.TransactionNotificationsResponse(
-            txid=self.txid,
-            event_type=self._type_to_tx_event_type(),
-            block_details=self.block_details.to_proto(),
-            account_key=self.account.to_proto(),
-        )
-        
 class TxConfirmedNotification(TxNotification):
     def __init__(self, txid: str, block_details: BlockDetails, account_name: str):
         super().__init__(NotificationType.TX_CONFIRMED, txid, block_details, account_name)

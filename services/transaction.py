@@ -40,6 +40,19 @@ class TransactionService:
         }
         return self._session.psbt_get_details(details).resolve()
 
+    def _add_redeem_scripts(self, psetBase64: str) -> str:
+        psbt = wally.psbt_from_base64(psetBase64)
+        addresses = self._account_service.list_all_addresses()
+        for i in range(wally.psbt_get_num_inputs(psbt)):
+            witness_utxo = wally.psbt_get_input_witness_utxo(psbt, i)
+            prevout_script = wally.tx_output_get_script(witness_utxo)
+            for a in addresses:
+                if a['blinding_script'] == wally.hex_from_bytes(prevout_script) and a['script_type'] in [14, 15]: # p2wsh, csv
+                    script = wally.witness_program_from_bytes(wally.hex_to_bytes(a['script']), wally.WALLY_SCRIPT_SHA256)
+                    wally.psbt_set_input_redeem_script(psbt, i, script)
+                    break
+        return wally.psbt_to_base64(psbt, 0)
+
     def _add_input_to_pset(self, psetb64: str, psetInput: PsetInputArgs) -> str:
         """add an input to a pset at the next available index, add witnessUtxo, utxoRangeproof and redeemScript if needed
 
@@ -59,8 +72,11 @@ class TransactionService:
         funding_tx = wally.tx_from_hex(funding_tx_hex, wally.WALLY_TX_FLAG_USE_ELEMENTS)
         wally.psbt_set_input_witness_utxo_from_tx(pset, idx, funding_tx, psetInput['vout'])
         wally.psbt_set_input_utxo_rangeproof(pset, idx, wally.tx_get_output_rangeproof(funding_tx, psetInput['vout']))
+        psetb64 = wally.psbt_to_base64(pset, 0)
 
-        return wally.psbt_to_base64(pset, 0)
+        # Add the redeem script if needed
+        psetb64 = self._add_redeem_scripts(psetb64)
+        return psetb64
 
     def _add_output_to_pset(self, psetb64: str, psetOutput: PsetOutputArgs) -> str:
         pset = wally.psbt_from_base64(psetb64)
@@ -92,13 +108,17 @@ class TransactionService:
         pset = wally.psbt_init(2, 0, 0, 0, wally.WALLY_PSBT_INIT_PSET)
         return wally.psbt_to_base64(pset, 0)
 
-    def create_pset(self, ins: List[PsetInputArgs], outs: List[PsetOutputArgs]) -> str:
-        pset = self._empty_pset()
+    def update_pset(self, psetb64: str, ins: List[PsetInputArgs], outs: List[PsetOutputArgs]) -> str:
+        pset = psetb64
         for inp in ins:
             pset = self._add_input_to_pset(pset, inp)
         for out in outs:
             pset = self._add_output_to_pset(pset, out)
         return pset
+
+    def create_pset(self, ins: List[PsetInputArgs], outs: List[PsetOutputArgs]) -> str:
+        pset = self._empty_pset()
+        return self.update_pset(pset, ins, outs)
 
     def blind_pset(self, psetBase64: str) -> str:
         psbt = wally.psbt_from_base64(psetBase64)
@@ -133,19 +153,6 @@ class TransactionService:
         self._ephemeral_priv_keys[hexlify(psbt_id)] = ephemeral_key
         return wally.psbt_to_base64(psbt, 0)
 
-    def _add_redeem_scripts(self, psetBase64: str) -> str:
-        psbt = wally.psbt_from_base64(psetBase64)
-        addresses = self._account_service.list_all_addresses()
-        for i in range(wally.psbt_get_num_inputs(psbt)):
-            witness_utxo = wally.psbt_get_input_witness_utxo(psbt, i)
-            prevout_script = wally.tx_output_get_script(witness_utxo)
-            for a in addresses:
-                if a['blinding_script'] == wally.hex_from_bytes(prevout_script) and a['script_type'] in [14, 15]: # p2wsh, csv
-                    script = wally.witness_program_from_bytes(wally.hex_to_bytes(a['script']), wally.WALLY_SCRIPT_SHA256)
-                    wally.psbt_set_input_redeem_script(psbt, i, script)
-                    break
-        return wally.psbt_to_base64(psbt, 0)
-     
     def sign_pset(self, psetBase64: str) -> str:
         psbt = wally.psbt_from_base64(psetBase64)
         outputs_len = wally.psbt_get_num_outputs(psbt)
@@ -154,8 +161,6 @@ class TransactionService:
             # raise an error if blinding is required
             blinding_status_guard_sign(i, out_status)
         
-        psetBase64 = self._add_redeem_scripts(psetBase64)
-
         utxos = self._gdk_api.get_all_utxos()
         utxos_to_sign: List[Tuple[int, Utxo]] = []
         
@@ -173,7 +178,7 @@ class TransactionService:
         blinding_nonces = []
         
         for out_index in range(outputs_len):
-            if wally.psbt_get_output_ecdh_public_key_len(psbt, out_index) == 0 or wally.psbt_get_output_blinding_public_key_len(psbt, out_index) == 0:
+            if wally.psbt_get_output_script_len(psbt, out_index) == 0 or wally.psbt_get_output_ecdh_public_key_len(psbt, out_index) == 0 or wally.psbt_get_output_blinding_public_key_len(psbt, out_index) == 0:
                 blinding_nonces.append('')
                 continue
             psbt_id = wally.psbt_get_id(psbt, 0)

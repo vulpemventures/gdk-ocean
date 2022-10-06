@@ -9,7 +9,7 @@ class AccountService:
         
     def _account_exists_guard(self, account_name: str):
         """check if the account already exists"""
-        existing_accounts = self._gdkAPI.get_acccounts()
+        existing_accounts = self._gdkAPI.get_accounts()
         if account_name in [a.name for a in existing_accounts]:
             raise Exception(f'account {account_name} already exists')
         
@@ -39,7 +39,7 @@ class AccountService:
 
     def list_all_addresses(self) -> List[AddressDetails]:
         """list all accounts addresses"""
-        accounts = self._gdkAPI.get_acccounts()
+        accounts = self._gdkAPI.get_accounts()
         result = []
         for account in accounts:
             for addresses in account.addresses():
@@ -60,6 +60,22 @@ class AccountService:
             unlocked = [utxo for utxo in utxosForAsset if not self._locker.is_locked(Outpoint.from_utxo(utxo))]
             utxos.extend(unlocked)
         return utxos
+    
+    def list_all_utxos(self) -> List[Utxo]:
+        """list all unlocked utxos for all accounts"""
+        accounts = self._gdkAPI.get_accounts()
+        result = []
+        for account in accounts:
+            account_utxos = self.list_utxos(account.name)
+            result += account_utxos
+        return result
+    
+    def get_utxo(self, txid: str, index: int) -> Utxo:
+        """get a specific utxo"""
+        all_utxos = self.list_all_utxos()
+        for u in all_utxos:
+            if u.txid == txid and u.index == index:
+                return u
 
     def get_GAID(self, account_name: str) -> str:
         """get the account GAID for the given account name"""

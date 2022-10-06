@@ -53,7 +53,7 @@ class GdkAccountAPI():
         unspents_outputs = self.unspents_outputs(min_num_confs)
         utxosByAsset = {}
         for asset, gdkUtxos in unspents_outputs.items():
-            utxosByAsset[asset] = [Utxo(gdkUtxo) for gdkUtxo in gdkUtxos]
+            utxosByAsset[asset] = [Utxo(gdkUtxo, self.name) for gdkUtxo in gdkUtxos]
         return utxosByAsset
     
     def transactions(self, min_block_height: int = None) -> List[Dict]:
@@ -151,7 +151,7 @@ class GdkAPI:
         details = self.session.login_user({}, details).resolve()
         return details
 
-    def get_acccounts(self) -> List[GdkAccountAPI]:
+    def get_accounts(self) -> List[GdkAccountAPI]:
         """get all the existing subaccounts from gdk and create GdkAccount objects for them"""
         subaccounts = self.session.get_subaccounts({}).resolve()
         accounts = [GdkAccountAPI(self.session, account['pointer'], account['name']) for account in subaccounts['subaccounts']]
@@ -159,7 +159,7 @@ class GdkAPI:
     
     def get_account(self, account_name: str) -> GdkAccountAPI:
         """get an account by account name"""
-        all_accounts = self.get_acccounts()
+        all_accounts = self.get_accounts()
         for a in all_accounts:
             if a.name == account_name:
                 return a
@@ -181,7 +181,7 @@ class GdkAPI:
 
     def get_all_unspents_outputs(self) -> List[GdkUtxo]:
         """get all the gdkUtxo objects for all accounts"""
-        accounts = self.get_acccounts()
+        accounts = self.get_accounts()
         unspents = []
         for account in accounts:
             account_utxos = account.unspents_outputs()
@@ -191,6 +191,14 @@ class GdkAPI:
 
     def get_all_utxos(self) -> List[Utxo]:
         """get all the Utxo objects for all accounts"""
+        accounts = self.get_accounts()
+        result = []
+        for account in accounts:
+            account_utxos = account.utxos()
+            for _, utxos in account_utxos.items():
+                result.extend(utxos)
+                
+        
         return [Utxo(utxo) for utxo in self.get_all_unspents_outputs()]
 
     def sign_pset(self, psetBase64: str, utxos: List[GdkUtxo], blinding_nonces: List) -> SignPsetResult:        
@@ -212,23 +220,21 @@ class GdkAPI:
 def make_session(network: str) -> gdk.Session:
     return gdk.Session({'name': network})
 
-def get_esplora_url(network: str) -> Tuple[str, str]:
+def get_esplora_url(network: str) -> str:
     """returns the esplora host and base url (depends on network)"""
-    blockstream_host = 'blockstream.info'
     base = '/{}/api'
 
     if network == 'testnet-liquid':
-        return blockstream_host, base.format('liquidtestnet')
+        return base.format('liquidtestnet')
 
     if network == 'liquid':
-        return blockstream_host, base.format('liquid')
+        return base.format('liquid')
 
     raise Exception("Unable to find base esplora url for network {}".format(network))
 
-def get_tx_status(network: str, txid: str) -> Dict:
-    host, base_url = get_esplora_url(network)
-    conn = http.client.HTTPSConnection(host)
-    conn.request('GET', '{}/tx/{}/status'.format(base_url, txid))
+def get_tx_status(explorerURL: str, txid: str) -> Dict:
+    conn = http.client.HTTPSConnection('blockstream.info')
+    conn.request('GET', '{}/tx/{}/status'.format(explorerURL, txid))
     response = conn.getresponse()
     
     if response.status != 200:
@@ -236,8 +242,8 @@ def get_tx_status(network: str, txid: str) -> Dict:
 
     return json.loads(response.read())
 
-def get_block_details(network: str, txid: str) -> BlockDetails:
-    tx_status = get_tx_status(network, txid)
+def get_block_details(explorerURL: str, txid: str) -> BlockDetails:
+    tx_status = get_tx_status(explorerURL, txid)
     
     if not tx_status["confirmed"]:
         raise Exception("Transaction not confirmed, impossible to fetch block details")

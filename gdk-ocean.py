@@ -4,6 +4,7 @@ import grpc
 import argparse
 
 from domain import FilePinDataRepository, Locker, make_session
+from domain.gdk import get_esplora_url
 from services import WalletService, TransactionService, NotificationsService, AccountService
 from handlers import GrpcWalletServicer, GrpcTransactionServicer, GrpcAccountServicer, GrpcNotificationsServicer
 
@@ -26,6 +27,8 @@ async def main():
     
     address = 'localhost:%d' % args.port
     
+    explorerURL = get_esplora_url(args.network)
+    
     # create the gdk session
     session = make_session(args.network)
     
@@ -36,15 +39,15 @@ async def main():
     locker = await Locker.create()
     account_service = AccountService(session, locker)
     transaction_service = TransactionService(session, locker)
-    notifications_service = NotificationsService(wallet_service)
+    notifications_service = NotificationsService(wallet_service, locker, explorerURL)
     
     # start the grpc server
     server = grpc.aio.server()
     server.add_insecure_port(address)
     
     wallet_servicer = GrpcWalletServicer(wallet_service)
-    transaction_servicer = GrpcTransactionServicer(transaction_service)
-    account_servicer = GrpcAccountServicer(account_service)
+    transaction_servicer = GrpcTransactionServicer(transaction_service, account_service, explorerURL)
+    account_servicer = GrpcAccountServicer(account_service, explorerURL)
     
     wallet_pb2_grpc.add_WalletServiceServicer_to_server(wallet_servicer, server)
     transaction_pb2_grpc.add_TransactionServiceServicer_to_server(transaction_servicer, server)

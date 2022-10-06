@@ -13,12 +13,12 @@ class WalletService:
             return False
         
         try:
-            self._gdkAPI.get_acccounts()
+            self._gdkAPI.get_accounts()
             return True
         except:
             return False
             
-    def generate_seed(self) -> str:
+    def generate_mnemonic(self) -> str:
         return gdk.generate_mnemonic()
     
     def create_wallet(self, mnemonic: str, password: str) -> None:
@@ -43,5 +43,5 @@ class WalletService:
         self._gdkAPI.login_with_pindata(pin_data, pin)
     
     def change_password(self, password: str, newPassword: str) -> None:
-        raise Exception('Not implemented')
+        raise NotImplementedError
     

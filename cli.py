@@ -1,30 +1,20 @@
+import json
 import logging
-from typing import Tuple
+from typing import List, Tuple
 import click
 import grpc
-from ocean import v1 as proto
+from ocean.v1 import wallet_pb2_grpc, account_pb2_grpc, notification_pb2_grpc, transaction_pb2_grpc, wallet_pb2, account_pb2, transaction_pb2, notification_pb2, types_pb2
 
-# AccountKey class is a duplicate version of AccountKey class in domain/account_key.py
-# it lets to run the cli without the domain package (and thus without the dependencies)
-class AccountKey():
-    def __init__(self, name: str, account_id: int) -> None:
-        self.name = name
-        self.id = account_id
-        
-    @classmethod
-    def from_name(cls, name: str) -> 'AccountKey':
-        return cls(name, 0)
-
-def _get_wallet_stub_from_context(ctx: click.Context) -> proto.WalletServiceStub:
+def _get_wallet_stub_from_context(ctx: click.Context) -> wallet_pb2_grpc.WalletServiceStub:
     return ctx.obj['wallet']
 
-def _get_account_stub_from_context(ctx: click.Context) -> proto.AccountServiceStub:
+def _get_account_stub_from_context(ctx: click.Context) -> account_pb2_grpc.AccountServiceStub:
     return ctx.obj['account']
 
-def _get_transaction_stub_from_context(ctx: click.Context) -> proto.TransactionServiceStub:
+def _get_transaction_stub_from_context(ctx: click.Context) -> transaction_pb2_grpc.TransactionServiceStub:
     return ctx.obj['transaction']
 
-def _get_notification_stub_from_context(ctx: click.Context) -> proto.NotificationServiceStub:
+def _get_notification_stub_from_context(ctx: click.Context) -> notification_pb2_grpc.NotificationServiceStub:
     return ctx.obj['notification']
 
 def parse_address(address: str) -> Tuple[str, int]:
@@ -46,10 +36,10 @@ def cli(ctx: click.Context, debug: bool, address: str):
     """
     host, port = parse_address(address)
     channel = grpc.insecure_channel(f'{host}:{port}')
-    wallet_svc = proto.WalletServiceStub(channel)
-    account_svc = proto.AccountServiceStub(channel)
-    transaction_svc = proto.TransactionServiceStub(channel)
-    notifications_svc = proto.NotificationServiceStub(channel)
+    wallet_svc = wallet_pb2_grpc.WalletServiceStub(channel)
+    account_svc = account_pb2_grpc.AccountServiceStub(channel)
+    transaction_svc = transaction_pb2_grpc.TransactionServiceStub(channel)
+    notifications_svc = notification_pb2_grpc.NotificationServiceStub(channel)
     
     ctx.ensure_object(dict)
 
@@ -71,8 +61,8 @@ def genseed(ctx: click.Context):
     Generate a random seed
     """
     wallet_stub = _get_wallet_stub_from_context(ctx)
-    seed = wallet_stub.GenSeed(wallet_pb2.GenSeedRequest())
-    logging.info(seed.mnemonic)
+    response = wallet_stub.GenSeed(wallet_pb2.GenSeedRequest())
+    logging.info(response.mnemonic)
 
 @cli.command()
 @click.option('--mnemonic', '-m', default=None)
@@ -111,9 +101,9 @@ def createaccount(ctx: click.Context, name: str):
     """
     create a new account with a given account name
     """
-    request = account_pb2.CreateAccountRequest(name=name)
+    request = account_pb2.CreateAccountCustomRequest(name=name)
     account_stub = _get_account_stub_from_context(ctx)
-    response = account_stub.CreateAccount(request)
+    response = account_stub.CreateAccountCustom(request)
     logging.info(response)
 
 @cli.command()
@@ -123,12 +113,8 @@ def getnewaddress(ctx: click.Context, account: str):
     """
     generate the next address for the given account name
     """
-    account_k = AccountKey.from_name(account).to_proto()
-    request = account_pb2.DeriveAddressRequest(account_key=account_k)
-    request.num_of_addresses = 1
-    
+    request = account_pb2.DeriveAddressRequest(account_name=account, num_of_addresses=1)
     account_stub = _get_account_stub_from_context(ctx)
-    
     response = account_stub.DeriveAddress(request)
     logging.info(response)
     
@@ -139,9 +125,7 @@ def listaddresses(ctx: click.Context, account: str):
     """
     list all addresses of an account
     """
-    account_k = AccountKey.from_name(account).to_proto()
-    request = account_pb2.ListAddressesRequest(account_key=account_k)
-    
+    request = account_pb2.ListAddressesRequest(account_name=account)
     account_stub = _get_account_stub_from_context(ctx)
     response = account_stub.ListAddresses(request)
     logging.info(response)
@@ -154,8 +138,7 @@ def balance(ctx: click.Context, account: str):
     """
     get the balance of a given account
     """
-    account_k = AccountKey.from_name(account).to_proto()
-    request = account_pb2.BalanceRequest(account_key=account_k)
+    request = account_pb2.BalanceRequest(account_name=account)
     account_stub = _get_account_stub_from_context(ctx)
     response = account_stub.Balance(request)
     logging.info(response)
@@ -167,8 +150,7 @@ def listutxos(ctx: click.Context, account: str):
     """
     list all the unlocked utxos of a given account
     """
-    account_k = AccountKey.from_name(account).to_proto()
-    request = account_pb2.ListUtxosRequest(account_key=account_k)
+    request = account_pb2.ListUtxosRequest(account_name=account)
     account_stub = _get_account_stub_from_context(ctx)
     response = account_stub.ListUtxos(request)
     logging.info(response)
@@ -194,13 +176,12 @@ def transfer(ctx: click.Context, account: str, to: str, sats: str, asset: str):
     """
     send some funds from an account to a given address
     """
-    account_k = AccountKey.from_name(account).to_proto()
     out = types_pb2.Output()
     out.asset = asset
     out.amount = int(sats)
     out.address = to
     receivers = [out]
-    request = transaction_pb2.TransferRequest(account_key=account_k, receivers=receivers)
+    request = transaction_pb2.TransferRequest(account_name=account, receivers=receivers)
     transaction_stub = _get_transaction_stub_from_context(ctx)
     response = transaction_stub.Transfer(request)
     logging.info(response)
@@ -214,21 +195,18 @@ def selectutxos(ctx: click.Context, account: str, sats: str, asset: str):
     """
     select utxos to use for a given amount of sats (and asset)
     """
-    account_k = AccountKey.from_name(account).to_proto()
-    request = transaction_pb2.SelectUtxosRequest(account_key=account_k, target_amount=int(sats), target_asset=asset, strategy=0)
+    request = transaction_pb2.SelectUtxosRequest(account_name=account, target_amount=int(sats), target_asset=asset, strategy=0)
     transaction_stub = _get_transaction_stub_from_context(ctx)
     response = transaction_stub.SelectUtxos(request)
     logging.info(response)
     
 @cli.command()
-@click.option('--account', '-a', default=None)
 @click.pass_context
-def watchutxos(ctx: click.Context, account: str):
+def watchutxos(ctx: click.Context):
     """
     start a loop logging the new utxo notifications for a given account
     """
-    account_k = AccountKey.from_name(account).to_proto()
-    request = notification_pb2.UtxosNotificationsRequest(account_key=account_k)
+    request = notification_pb2.UtxosNotificationsRequest()
     notification_stub = _get_notification_stub_from_context(ctx)
     for notification in notification_stub.UtxosNotifications(request):
         logging.info(notification)
@@ -255,6 +233,70 @@ def gettransaction(ctx: click.Context, txid: str):
     transaction_stub = _get_transaction_stub_from_context(ctx)
     response = transaction_stub.GetTransaction(request)
     logging.info(response)
+
+
+def parse_input_string(input_str: str) -> types_pb2.Input:
+    """
+    parse the input string into a list of inputs
+    """
+    i = json.loads(input_str)
+    if i['txid'] is None or i['index'] is None:
+        raise Exception('txid and index are required')
+    return types_pb2.Input(txid=i['txid'], index=i['index'])
+
+def parse_output_string(output_str: str) -> types_pb2.Output:
+    """
+    parse the output string into a list of outputs
+    """
+    o = json.loads(output_str)
+    if o['address'] is None or o['amount'] is None or o['asset'] is None:
+        raise Exception('address, amount and asset are required')
+    return types_pb2.Output(address=o['address'], amount=o['amount'], asset=o['asset'])
+
+@cli.command()
+@click.option('--input', '-i', multiple=True, default=[])
+@click.option('--output', '-o', multiple=True, default=[])
+@click.pass_context
+def createpset(ctx: click.Context, input: List[str], output: List[str]):
+    """
+    create a pset from a list of inputs and outputs
+    """
+    inputs = [parse_input_string(i) for i in input]
+    outputs = [parse_output_string(o) for o in output]
+    transaction_stub = _get_transaction_stub_from_context(ctx)
+    response = transaction_stub.CreatePset(transaction_pb2.CreatePsetRequest(inputs=inputs, outputs=outputs))
+    logging.info(response.pset)
+    
+@cli.command()
+@click.option('--pset', '-p', default=None)
+@click.option('--input', '-i', multiple=True, default=[])
+@click.option('--output', '-o', multiple=True, default=[])
+@click.pass_context
+def updatepset(ctx: click.Context, pset: str, input: List[str], output: List[str]):
+    """
+    update an existing pset
+    """
+    inputs = [parse_input_string(i) for i in input]
+    outputs = [parse_output_string(o) for o in output]
+    transaction_stub = _get_transaction_stub_from_context(ctx)
+    response = transaction_stub.UpdatePset(transaction_pb2.UpdatePsetRequest(pset=pset, inputs=inputs, outputs=outputs))
+    logging.info(response.pset)
+    
+@cli.command()
+@click.option('--pset', '-p', default=None)
+@click.pass_context
+def blindpset(ctx: click.Context, pset: str):
+    transaction_stub = _get_transaction_stub_from_context(ctx)
+    response = transaction_stub.BlindPset(transaction_pb2.BlindPsetRequest(pset=pset))
+    logging.info(response.pset)
+    
+@cli.command()
+@click.option('--pset', '-p', default=None)
+@click.pass_context
+def signpset(ctx: click.Context, pset: str):
+    transaction_stub = _get_transaction_stub_from_context(ctx)
+    response = transaction_stub.SignPset(transaction_pb2.SignPsetRequest(pset=pset))
+    logging.info(response.pset)
 
 if __name__ == '__main__':
     cli(obj={})

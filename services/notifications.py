@@ -3,12 +3,13 @@ import logging
 
 from typing import Dict, Set, List
 from domain import BaseNotification, TxConfirmedNotification, UtxoSpentNotification, UtxoUnspecifiedNotification, Utxo, get_block_details, GdkAPI
+from domain.locker import Locker
 from services.wallet import WalletService
 
 def _get_utxos_by_account(gdk_api: GdkAPI) -> Dict[str, Dict[str, List[Utxo]]]:
     """this is an utility function to get the utxos for all the wallet accounts"""
     utxos_by_account: Dict[str, Dict[str, List[Utxo]]] = {}
-    accounts = gdk_api.get_acccounts()
+    accounts = gdk_api.get_accounts()
     for account in accounts:
         utxos_by_account[account.name] = account.utxos()
     return utxos_by_account    
@@ -41,11 +42,13 @@ def _diff_utxos_list(current: Dict[str, List[Utxo]], new: Dict[str, List[Utxo]],
     return notifs
 
 class NotificationsService():
-    def __init__(self, wallet_svc: WalletService) -> None:
+    def __init__(self, wallet_svc: WalletService, locker: Locker, explorerURL: str) -> None:
         self._session = wallet_svc._gdkAPI.session
         self._gdk_api = wallet_svc._gdkAPI
         self._started = False
         self._wallet_svc = wallet_svc
+        self._locker_svc = locker
+        self._explorerURL = explorerURL
         
         self.queue = asyncio.Queue()
         
@@ -58,7 +61,7 @@ class NotificationsService():
             self._utxos_by_account = _get_utxos_by_account(self._gdk_api)
         except:
             self._utxos_by_account = {}    
-    
+        
     def _get_last_block_height(self) -> int:
         """return the last block height"""
         while True:
@@ -88,10 +91,10 @@ class NotificationsService():
     async def _put_confirmed_txs_notifications(self) -> None:
         notifications: List[TxConfirmedNotification] = []
         last_block_heigth = self._get_chain_tip()
-        for account in self._gdk_api.get_acccounts():
+        for account in self._gdk_api.get_accounts():
             try:
                 txs_for_height = account.transactions(last_block_heigth)
-                notifications = notifications + [TxConfirmedNotification(tx['txhash'], get_block_details(tx['txhash']), account.name) for tx in txs_for_height] 
+                notifications = notifications + [TxConfirmedNotification(tx['txhash'], get_block_details(self._explorerURL, tx['txhash'])) for tx in txs_for_height] 
             except Exception as e:
                 logging.exception(e)
                 continue
@@ -126,8 +129,7 @@ class NotificationsService():
             await asyncio.sleep(30)
         
     async def _handle_locker_notifications(self) -> None:
-        wallet = self._wallet_svc.get_wallet()
-        locker_notifications_queue = wallet.locker.notifications_queue
+        locker_notifications_queue = self._locker_svc.notifications_queue
         while True:
             n = await locker_notifications_queue.get()
             await self._put_in_queue(n)
@@ -139,9 +141,18 @@ class NotificationsService():
     def add_utxos_check_account(self, account_name: str) -> None:
         self._utxos_check_accounts.add(account_name)
     
+    def add_all_accounts(self) -> List[str]:
+        accounts = [a.name for a in self._gdk_api.get_accounts()]
+        for account in accounts:
+            self._utxos_check_accounts.add(account.name)
+        return 
+    
     def remove_utxos_check_account(self, account_name: str) -> None:
         self._utxos_check_accounts.remove(account_name)
     
+    def remove_all_accounts(self) -> None:
+        self._utxos_check_accounts.clear()
+
     async def start(self) -> None:
         self._check_not_started()
 

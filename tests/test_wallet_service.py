@@ -23,7 +23,7 @@ def test_create_wallet(password: str):
     pin_data_repo = InMemoryPinDataRepository()
     session = make_session('testnet-liquid')
     walletSvc = WalletService(session, pin_data_repo)
-    seed = walletSvc.generate_seed()
+    seed = walletSvc.generate_mnemonic()
     walletSvc.create_wallet(seed, password)
     assert walletSvc.is_logged() is True
     pin_data = pin_data_repo.read()

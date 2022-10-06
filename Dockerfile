@@ -8,6 +8,7 @@ RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # deps
+COPY wallycore-0.8.5-cp39-cp39-linux_x86_64.whl .
 COPY requirements.txt ./requirements.txt
 RUN pip install -r requirements.txt
 

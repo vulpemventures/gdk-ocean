@@ -8,7 +8,7 @@ async def init_account_service() -> Tuple[AccountService, GdkAPI]:
     session = make_session('testnet-liquid')
     repo = InMemoryPinDataRepository()
     walletSvc = WalletService(session, repo)
-    seed = walletSvc.generate_seed()
+    seed = walletSvc.generate_mnemonic()
     walletSvc.create_wallet(seed, 'testdonotuse')
     locker = await Locker.create()
     accountSvc = AccountService(session, locker)

@@ -44,41 +44,6 @@ async def test_send_pset():
     assert tx is not None
 
 @pytest.mark.asyncio
-async def test_send_fee_nonlast_pset():
-    accountName = 'mainAccountTest'
-    session = make_session('testnet-liquid')
-    locker = await Locker.create()
-    transactionSvc = TransactionService(session, locker)
-    accountSvc = AccountService(session, locker)
-    walletSvc = WalletService(session, InMemoryPinDataRepository())
-    walletSvc.create_wallet(TEST_MNEMONIC, TEST_PASSWORD)
-
-    addrs = accountSvc.derive_address(accountName, 2)
-    coinSelection = transactionSvc.select_utxos(accountName, '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49', 100000)
-    FEE = 500
-    
-    gdkAPI = GdkAPI(session)
-    
-    lbtc = '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49'
-    outputs = [
-        { 'address': addrs[0]['address'], 'amount': coinSelection.amount - FEE, 'asset': lbtc, 'blinder_index': 0 },
-        { 'address': None, 'amount': FEE, 'asset': lbtc, 'blinder_index': None }
-    ]
-    
-    if coinSelection.change > 0:
-        outputs += [{ 'address': addrs[1]['address'], 'amount': coinSelection.change, 'asset': lbtc, 'blinder_index': 0 }]
-    
-    psetb64 = transactionSvc.create_pset([u.to_pset_input_args() for u in coinSelection.utxos], outputs)
-    blinded = transactionSvc.blind_pset(psetb64)
-    signed = transactionSvc.sign_pset(blinded)
-    assert signed is not None
-
-    pset = wally.psbt_from_base64(signed)
-    wally.psbt_finalize(pset)
-    tx = wally.psbt_extract(pset)
-    assert tx is not None
-    
-@pytest.mark.asyncio
 async def test_send_amp_confidential_pset():
     accountName = 'mainAccountTest'
     ampAccountName = 'ampAccountTest'

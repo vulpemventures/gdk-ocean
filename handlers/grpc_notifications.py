@@ -2,6 +2,7 @@ import asyncio
 import logging
 from typing import Dict, List
 from domain import BaseNotification, NotificationType
+from handlers.utils import make_tx_notification_proto, make_utxo_notification_proto
 from ocean.v1 import notification_pb2, notification_pb2_grpc
 from services import NotificationsService
 
@@ -67,26 +68,26 @@ class GrpcNotificationsServicer(notification_pb2_grpc.NotificationServiceService
         self.next_id += 1
         return id_sub
     
-    async def TransactionNotifications(self, request: notification_pb2.TransactionNotificationsRequest, _):
+    async def TransactionNotifications(self, _: notification_pb2.TransactionNotificationsRequest, __):
         id_subscriber = self._add_subscriber(_Subscriber.transactions())
         
         try:
             while True:
                 notification = await self._subscribers[id_subscriber].get()
-                proto_msg = notification.to_proto()
+                proto_msg = make_tx_notification_proto(notification) 
                 yield proto_msg
         finally:
             del self._subscribers[id_subscriber]
 
-    async def UtxosNotifications(self, request: notification_pb2.UtxosNotificationsRequest, _):
-        self._svc.add_utxos_check_account(request.account_key.name)
+    async def UtxosNotifications(self, _: notification_pb2.UtxosNotificationsRequest, __):
+        self._svc.add_all_accounts()
         id_subscriber = self._add_subscriber(_Subscriber.utxos())
 
         try:
             while True:
                 notification = await self._subscribers[id_subscriber].get()
-                proto_msg = notification.to_proto()
+                proto_msg = make_utxo_notification_proto(notification)
                 yield proto_msg
         finally:
             del self._subscribers[id_subscriber]
-            self._svc.remove_utxos_check_account(request.account_key.name)
+            self._svc.remove_all_accounts()

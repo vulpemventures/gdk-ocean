@@ -10,12 +10,7 @@ The current version of gdk-ocean uses Python 3.9
 
 __the first time you run the program, you have to set up the virtual env with all dependencies.__
 
-Init the submodules:
-```
-git submodule update --init --recursive
-```
-
-And copy the stubs:
+Generate the protobuf ocean stubs:
 ```
 make stubs
 ```
@@ -49,7 +44,6 @@ make test
 
 Init the submodules and copy the proto stubs:
 ```
-git submodule update --init --recursive
 make stubs
 ```
 
@@ -71,7 +65,7 @@ You can communicate with gdk-ocean using the `cli.py` script. It must be run by 
 
 In your virtual enviroment, install the CLI dependencies:
 ```bash
-pip install -r requirements_cli.txt
+make deps-cli
 ```
 
 > if you are running the server in a container or if u don't want to mix CLI & server env, you can create venv with: `python3.9 -m venv venv_cli`
