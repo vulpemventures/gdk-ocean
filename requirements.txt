@@ -6,3 +6,4 @@ pytest-asyncio
 protobuf==3.19.3
 grpcio==1.43.0
 grpcio-tools==1.43.0
+python-dotenv

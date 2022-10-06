@@ -1,3 +1,4 @@
+import os
 import pytest
 import wallycore as wally
 
@@ -5,7 +6,14 @@ from domain import FilePinDataRepository, make_session, Locker, GdkAPI, InMemory
 from services import TransactionService, WalletService, AccountService
 
 TEST_PASSWORD = 'testdonotuse'
-TEST_MNEMONIC = 'merit choice antique call primary wise first foot fold fire right share'
+
+testnet_test_mnemonic = 'TESTNET_TEST_MNEMONIC'
+if os.environ.get(testnet_test_mnemonic) is not None:
+    TEST_MNEMONIC = os.environ[testnet_test_mnemonic]
+else:
+    from dotenv import load_dotenv
+    load_dotenv()
+    TEST_MNEMONIC = os.environ[testnet_test_mnemonic]
 
 @pytest.mark.asyncio
 async def test_send_pset():
