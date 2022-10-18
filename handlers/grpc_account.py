@@ -19,12 +19,12 @@ class GrpcAccountServicer(account_pb2_grpc.AccountServiceServicer):
     def SetAccountTemplate(self, request, context):
         raise Exception("unimplemented rpc")
     
-    def DeriveAddress(self, request: account_pb2.DeriveAddressRequest, _) -> account_pb2.DeriveAddressResponse:
+    def DeriveAddresses(self, request: account_pb2.DeriveAddressesRequest, _) -> account_pb2.DeriveAddressesResponse:
         addresses = self._svc.derive_address(request.account_name, request.num_of_addresses)
-        return account_pb2.DeriveAddressResponse(addresses=map(lambda address: address['address'], addresses))
+        return account_pb2.DeriveAddressesResponse(addresses=map(lambda address: address['address'], addresses))
     
     def DeriveChangeAddress(self, request, _):
-        return self.DeriveAddress(request, _)
+        return self.DeriveAddresses(request, _)
     
     def ListAddresses(self, request: account_pb2.ListAddressesRequest, _):
         addresses = self._svc.list_addresses(request.account_name)

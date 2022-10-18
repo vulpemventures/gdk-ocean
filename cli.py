@@ -113,9 +113,9 @@ def getnewaddress(ctx: click.Context, account: str):
     """
     generate the next address for the given account name
     """
-    request = account_pb2.DeriveAddressRequest(account_name=account, num_of_addresses=1)
+    request = account_pb2.DeriveAddressesRequest(account_name=account, num_of_addresses=1)
     account_stub = _get_account_stub_from_context(ctx)
-    response = account_stub.DeriveAddress(request)
+    response = account_stub.DeriveAddresses(request)
     logging.info(response)
     
 @cli.command()

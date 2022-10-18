@@ -2,8 +2,10 @@
 from typing import List
 from domain import Utxo, PsetInputArgs, BlockDetails, NotificationType, TxNotification, UtxoNotification
 from domain.gdk import get_block_details
+from domain.types import InputBlindingData
 from ocean.v1 import notification_pb2, types_pb2
 from services import AccountService
+import wallycore as wally
 
 def make_utxo_proto(utxo: Utxo, explorerURL: str) -> types_pb2.Utxo:
     utxo_pb = types_pb2.Utxo(
@@ -78,3 +80,18 @@ def make_tx_notification_proto(notification: TxNotification) -> notification_pb2
         event_type=make_tx_event_type_proto(notification.type),
         block_details=make_block_details_proto(notification.block_details),
     )
+
+def unblinded_input_proto_to_blinding_data(unblinded_input: types_pb2.UnblindedInput) -> InputBlindingData:
+    return InputBlindingData(
+        input_index=unblinded_input.index,
+        asset=h2b(unblinded_input.asset),
+        asset_blinder=h2b_rev(unblinded_input.asset_blinder),
+        value=wally.tx_confidential_value_to_satoshi(unblinded_input.amount),
+        value_blinder=h2b_rev(unblinded_input.amount_blinder)
+    )
+    
+def h2b(h: str):
+    return wally.hex_to_bytes(h)
+
+def h2b_rev(h: str):
+    return h2b(h)[::-1]

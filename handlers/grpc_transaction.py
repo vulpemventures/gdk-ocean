@@ -2,7 +2,7 @@ import logging
 import wallycore as wally
 from domain import Receiver 
 from domain.types import PsetOutputArgs
-from handlers.utils import make_utxo_proto, make_utxos_list_proto
+from handlers.utils import make_utxo_proto, make_utxos_list_proto, unblinded_input_proto_to_blinding_data
 from services import TransactionService, AccountService
 from ocean.v1 import transaction_pb2, transaction_pb2_grpc
 
@@ -68,7 +68,8 @@ class GrpcTransactionServicer(transaction_pb2_grpc.TransactionServiceServicer):
         return transaction_pb2.UpdatePsetResponse(pset=self._transaction_svc.update_pset(pset, inputs, outputs))
     
     def BlindPset(self, request: transaction_pb2.BlindPsetRequest, _) -> transaction_pb2.BlindPsetResponse:
-        blinded = self._transaction_svc.blind_pset(request.pset)
+        extra_blinding_data = [unblinded_input_proto_to_blinding_data(i) for i in request.extra_unblinded_inputs]
+        blinded = self._transaction_svc.blind_pset(request.pset, extra_blinding_data)
         return transaction_pb2.BlindPsetResponse(pset=blinded)
     
     def SignPset(self, request: transaction_pb2.SignPsetRequest, _) -> transaction_pb2.SignPsetResponse:

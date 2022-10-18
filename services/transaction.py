@@ -120,9 +120,16 @@ class TransactionService:
         pset = self._empty_pset()
         return self.update_pset(pset, ins, outs)
 
-    def blind_pset(self, psetBase64: str) -> str:
+    def blind_pset(self, psetBase64: str, extra_blinding_data: List[InputBlindingData] = []) -> str:
         psbt = wally.psbt_from_base64(psetBase64)
-        inputs_blinding_data = self._get_inputs_blinding_data(psetBase64)
+        wallet_blinding_data = self._get_inputs_blinding_data_from_wallet(psetBase64)
+        all_blinding_data = wallet_blinding_data + extra_blinding_data
+
+        num_inputs = wally.psbt_get_num_inputs(psbt)
+        inputs_blinding_data = []
+        for i in range(num_inputs):
+            blinding_data = find_blinding_data_for_input(i, all_blinding_data)
+            inputs_blinding_data.append(blinding_data)
 
         valueBlindingFactors, values, assetBlindingFactors, assets = [wally.map_init(len(inputs_blinding_data), None) for _ in range(4)]
         for i, blinding_data in enumerate(inputs_blinding_data):
@@ -225,7 +232,7 @@ class TransactionService:
     def get_transaction(self, txid: str) -> TransactionDetails:
         return self._gdk_api.get_transaction(txid)
 
-    def _get_inputs_blinding_data(self, psbtb64: str) -> List[InputBlindingData]:
+    def _get_inputs_blinding_data_from_wallet(self, psbtb64: str) -> List[InputBlindingData]:
         blinding_data = []
         utxos = self._gdk_api.get_all_utxos()
         psbt = wally.psbt_from_base64(psbtb64)
@@ -270,7 +277,6 @@ def get_blinding_nonce(psbt, ephemeral_keys, output_index):
 def h2b_rev(h: str):
     return wally.hex_to_bytes(h)[::-1]
 
-
 class AnalyzeAddressResult(TypedDict):
     network: str
     isSegwit: bool
@@ -307,3 +313,9 @@ def decode_address(address: str) -> DecodeAddressResult:
         'scriptPubKey': wally.hex_from_bytes(scriptpubkey),
         'blindingPubKey': wally.hex_from_bytes(blindingPubKey)
     }
+
+def find_blinding_data_for_input(index: int, blinding_data: List[InputBlindingData]) -> InputBlindingData:
+    for d in blinding_data:
+        if d['input_index'] == index:
+            return d
+    raise Exception('Blinding data not found for input ' + str(index))

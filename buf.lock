@@ -4,4 +4,4 @@ deps:
   - remote: buf.build
     owner: vulpemventures
     repository: ocean
-    commit: c6031079a07042318a1598e181ff8429
+    commit: c1e9043370524e288fd4cd7141891337
