@@ -1,6 +1,6 @@
 google==3.0.0
 greenaddress @ https://github.com/Blockstream/gdk/releases/download/release_0.0.56/greenaddress-0.0.56-cp39-cp39-linux_x86_64.whl
-./wallycore-0.8.5-cp39-cp39-linux_x86_64.whl # todo: request from github
+wallycore @ https://github.com/ElementsProject/libwally-core/releases/download/release_0.8.6/wallycore-0.8.6-cp39-cp39-manylinux_2_12_x86_64.manylinux2010_x86_64.whl
 pytest
 pytest-asyncio
 protobuf==3.19.3
