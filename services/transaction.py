@@ -123,16 +123,11 @@ class TransactionService:
     def blind_pset(self, psetBase64: str, extra_blinding_data: List[InputBlindingData] = []) -> str:
         psbt = wally.psbt_from_base64(psetBase64)
         wallet_blinding_data = self._get_inputs_blinding_data_from_wallet(psetBase64)
-        all_blinding_data = wallet_blinding_data + extra_blinding_data
-
-        num_inputs = wally.psbt_get_num_inputs(psbt)
-        inputs_blinding_data = []
-        for i in range(num_inputs):
-            blinding_data = find_blinding_data_for_input(i, all_blinding_data)
-            inputs_blinding_data.append(blinding_data)
+        inputs_blinding_data = wallet_blinding_data + extra_blinding_data
 
         valueBlindingFactors, values, assetBlindingFactors, assets = [wally.map_init(len(inputs_blinding_data), None) for _ in range(4)]
-        for i, blinding_data in enumerate(inputs_blinding_data):
+        for _, blinding_data in enumerate(inputs_blinding_data):
+            i = blinding_data['input_index']
             wally.map_add_integer(values, i, blinding_data['value'])
             wally.map_add_integer(valueBlindingFactors, i, blinding_data['value_blinder'])
             wally.map_add_integer(assets, i, blinding_data['asset'])
@@ -145,7 +140,7 @@ class TransactionService:
             if wally.psbt_get_output_script_len(psbt, i) == 0:
                 continue # skip the fee outputs
             out_blinder_index = wally.psbt_get_output_blinder_index(psbt, i)
-            if out_blinder_index in blinder_indexes_to_blind and wally.psbt_get_output_blinding_public_key_len(psbt, i) != 0:
+            if out_blinder_index in blinder_indexes_to_blind:
                 if wally.psbt_get_output_blinding_public_key_len(psbt, i) == 0:
                     raise Exception('output blinding pubkey not set but has blinder index')
                 num_outputs_to_blind += 1
@@ -313,9 +308,3 @@ def decode_address(address: str) -> DecodeAddressResult:
         'scriptPubKey': wally.hex_from_bytes(scriptpubkey),
         'blindingPubKey': wally.hex_from_bytes(blindingPubKey)
     }
-
-def find_blinding_data_for_input(index: int, blinding_data: List[InputBlindingData]) -> InputBlindingData:
-    for d in blinding_data:
-        if d['input_index'] == index:
-            return d
-    raise Exception('Blinding data not found for input ' + str(index))
