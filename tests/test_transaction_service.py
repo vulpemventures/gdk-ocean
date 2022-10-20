@@ -155,6 +155,8 @@ async def test_swap_pset():
     
     aliceAccountName = 'swapTestAccount'
     bobAccountName = 'swapTestAccount'
+    bobAccountNameForFee = 'swapTestAccountFee'
+    
     
     alice = await create_gdk_ocean_services(ALICE_MNEMONIC)
     bob = await create_gdk_ocean_services(BOB_MNEMONIC)
@@ -165,35 +167,27 @@ async def test_swap_pset():
     
     FEES_AMOUNT = 500
     
-    bob_utxos_selection = bob['transactionSvc'].select_utxos(bobAccountName, TEST_asset_hash, 1500)
-    alice_utxos_selection = alice['transactionSvc'].select_utxos(aliceAccountName, LBTC_asset_hash, 1500 + FEES_AMOUNT)
-    
+    blinder_index = 0
     bob_address = bob['accountSvc'].derive_address(bobAccountName, 1)[0]
-    alice_address = alice['accountSvc'].derive_address(aliceAccountName, 1)[0]
+    bob_utxos_selection = bob['transactionSvc'].select_utxos(bobAccountName, TEST_asset_hash, 1500)
+    bob_utxos_selection_fees = bob['transactionSvc'].select_utxos(bobAccountNameForFee, LBTC_asset_hash, FEES_AMOUNT)
     
-    
-    alice_blinder_index = 0
-    inputs = [u.to_pset_input_args() for u in alice_utxos_selection.utxos]
-    inputs += [u.to_pset_input_args() for u in bob_utxos_selection.utxos]
-
-    outputs = [
-        {'address': bob_address['address'], 'amount': 1500, 'asset': LBTC_asset_hash, 'blinder_index': alice_blinder_index},
-        {'address': alice_address['address'], 'amount': 1500, 'asset': TEST_asset_hash, 'blinder_index': alice_blinder_index},
+    bob_inputs = [u.to_pset_input_args() for u in bob_utxos_selection.utxos] + [u.to_pset_input_args() for u in bob_utxos_selection_fees.utxos]
+    bob_outputs = [
+        {'address': bob_address['address'], 'amount': 1500, 'asset': LBTC_asset_hash, 'blinder_index': blinder_index},
+        {'address': None, 'amount': FEES_AMOUNT, 'asset': LBTC_asset_hash, 'blinder_index': None}
     ]
-
-    if alice_utxos_selection.change > 0:
-        outputs += [{ 'address': alice_address['address'], 'amount': alice_utxos_selection.change, 'asset': LBTC_asset_hash, 'blinder_index': alice_blinder_index }]
-        
+    
     if bob_utxos_selection.change > 0:
-        outputs += [{ 'address': bob_address['address'], 'amount': bob_utxos_selection.change, 'asset': TEST_asset_hash, 'blinder_index': alice_blinder_index }]
-    
-    outputs += [{'address': None, 'amount': FEES_AMOUNT, 'asset': '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49', 'blinder_index': None}]
+        bob_outputs += [{ 'address': bob_address['address'], 'amount': bob_utxos_selection.change, 'asset': TEST_asset_hash, 'blinder_index': blinder_index }]
 
-    pset = alice['transactionSvc'].create_pset(inputs, outputs)
+    if bob_utxos_selection_fees.change > 0:
+        bob_outputs += [{ 'address': bob_address['address'], 'amount': bob_utxos_selection_fees.change, 'asset': LBTC_asset_hash, 'blinder_index': blinder_index }]
     
-    # bob creates the blinding data to send to alice
+    # bob creates the pset and send it to alice with the blinding data associated with inputs
+    pset = bob['transactionSvc'].create_pset(bob_inputs, bob_outputs)
     bob_blinding_data = []
-    num_inputs = len(inputs)
+    num_inputs = len(bob_inputs)
     pset_wally = wally.psbt_from_base64(pset) 
     for i in range(num_inputs):
         txid = wally.hex_from_bytes(wally.psbt_get_input_previous_txid(pset_wally, i)[::-1])
@@ -202,11 +196,28 @@ async def test_swap_pset():
                 bob_blinding_data.append(u.to_blinding_data(i))
                 break
     
-    # blind
+    # alice receives the pset and blinding data
+    alice_address = alice['accountSvc'].derive_address(aliceAccountName, 1)[0]
+    alice_utxos_selection = alice['transactionSvc'].select_utxos(aliceAccountName, LBTC_asset_hash, 1500)
+    
+    alice_inputs = [u.to_pset_input_args() for u in alice_utxos_selection.utxos]
+    alice_outputs = [
+        {'address': alice_address['address'], 'amount': 1500, 'asset': TEST_asset_hash, 'blinder_index': blinder_index},
+    ]
+
+    if alice_utxos_selection.change > 0:
+        alice_outputs += [{ 'address': alice_address['address'], 'amount': alice_utxos_selection.change, 'asset': LBTC_asset_hash, 'blinder_index': blinder_index }]
+        
+    # alice adds its inputs and outputs to the pset
+    pset = alice['transactionSvc'].update_pset(pset, alice_inputs, alice_outputs)
+    
+    # alice blinds the outputs (using the bob's blinding data)
     blinded_pset = alice['transactionSvc'].blind_pset(pset, bob_blinding_data)
 
-    # sign
+    # alice signs the pset
     signed = alice['transactionSvc'].sign_pset(blinded_pset)
+    
+    # bob receives the signed pset from alice and add signatures
     signed = bob['transactionSvc'].sign_pset(signed)
     
     pset = wally.psbt_from_base64(signed)
