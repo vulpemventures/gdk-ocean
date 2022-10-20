@@ -2,25 +2,24 @@ import asyncio
 import logging
 import grpc
 import argparse
-from handlers.grpc_account import GrpcAccountServicer
-from handlers.grpc_notifications import GrpcNotificationsServicer
-from handlers.grpc_transaction import GrpcTransactionServicer
-from handlers.grpc_wallet import GrpcWalletServicer
-from services.account import AccountService
-from services.notifications import NotificationsService
-from services.transaction import TransactionService
-from services.wallet import WalletService
+
+from domain import FilePinDataRepository, Locker, make_session
+from domain.gdk import get_esplora_url
+from services import WalletService, TransactionService, NotificationsService, AccountService
+from handlers import GrpcWalletServicer, GrpcTransactionServicer, GrpcAccountServicer, GrpcNotificationsServicer
 
 from signal import SIGINT, SIGTERM
-from ocean.v1alpha import wallet_pb2_grpc, notification_pb2_grpc, transaction_pb2_grpc, account_pb2_grpc
+from ocean.v1 import wallet_pb2_grpc, notification_pb2_grpc, transaction_pb2_grpc, account_pb2_grpc
 import greenaddress as gdk
 
-# NETWORK = "liquid"
-NETWORK = "testnet-liquid"
+logging.basicConfig(level=logging.DEBUG)
 
 async def main():
     parser = argparse.ArgumentParser(description='Ocean gRPC server')
     parser.add_argument('--port', type=int, default=50051, help='gRPC port')
+    parser.add_argument('--pin_data_path', type=str, default='./pin_data.json', help='path to encrypted pin data file')
+    parser.add_argument('--network', type=str, default='testnet-liquid', help='network to run the session on (testnet-liquid or liquid)')
+    
     args = parser.parse_args()
 
     # init GDK config
@@ -28,20 +27,28 @@ async def main():
     
     address = 'localhost:%d' % args.port
     
-    wallet_service = WalletService(NETWORK)
-    transaction_service = TransactionService(wallet_service)
-    notifications_service = NotificationsService(wallet_service)
-    account_service = AccountService(wallet_service)
-
-    logging.basicConfig(level=logging.DEBUG)
+    explorerURL = get_esplora_url(args.network)
+    
+    # create the gdk session
+    session = make_session(args.network)
+    
+    # create the file store for the pin_data
+    pin_data_repo = FilePinDataRepository(args.pin_data_path)
+    
+    wallet_service = WalletService(session, pin_data_repo)
+    locker = await Locker.create()
+    account_service = AccountService(session, locker)
+    transaction_service = TransactionService(session, locker)
+    notifications_service = NotificationsService(wallet_service, locker, explorerURL)
     
     # start the grpc server
     server = grpc.aio.server()
     server.add_insecure_port(address)
     
     wallet_servicer = GrpcWalletServicer(wallet_service)
-    transaction_servicer = GrpcTransactionServicer(transaction_service)
-    account_servicer = GrpcAccountServicer(account_service)
+    transaction_servicer = GrpcTransactionServicer(transaction_service, account_service, explorerURL)
+    account_servicer = GrpcAccountServicer(account_service, explorerURL)
+    
     wallet_pb2_grpc.add_WalletServiceServicer_to_server(wallet_servicer, server)
     transaction_pb2_grpc.add_TransactionServiceServicer_to_server(transaction_servicer, server)
     account_pb2_grpc.add_AccountServiceServicer_to_server(account_servicer, server)
@@ -67,7 +74,6 @@ async def main():
         
     
 if __name__ == "__main__":
-    
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     main_task = asyncio.ensure_future(main())

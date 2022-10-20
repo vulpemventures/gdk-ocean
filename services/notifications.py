@@ -1,20 +1,17 @@
 import asyncio
 import logging
-from time import time
-from typing import Dict, Set, TypedDict, List
-from domain.gdk_wallet import GdkWallet
-from domain.notification import BaseNotification, TxConfirmedNotification, UtxoSpentNotification, UtxoUnspecifiedNotification
-from domain.utxo import Utxo
+
+from typing import Dict, Set, List
+from domain import BaseNotification, TxConfirmedNotification, UtxoSpentNotification, UtxoUnspecifiedNotification, Utxo, get_block_details, GdkAPI
+from domain.locker import Locker
 from services.wallet import WalletService
 
-def _get_utxos_by_account(wallet: GdkWallet) -> Dict[str, Dict[str, List[Utxo]]]:
+def _get_utxos_by_account(gdk_api: GdkAPI) -> Dict[str, Dict[str, List[Utxo]]]:
     """this is an utility function to get the utxos for all the wallet accounts"""
     utxos_by_account: Dict[str, Dict[str, List[Utxo]]] = {}
-    
-    for name, account in wallet.accounts.items():
-        utxos = account.get_all_utxos(False)
-        utxos_by_account[name] = utxos
-    
+    accounts = gdk_api.get_accounts()
+    for account in accounts:
+        utxos_by_account[account.name] = account.utxos()
     return utxos_by_account    
 
 def _diff_utxos_list(current: Dict[str, List[Utxo]], new: Dict[str, List[Utxo]], account: str) -> List[BaseNotification]:
@@ -25,7 +22,6 @@ def _diff_utxos_list(current: Dict[str, List[Utxo]], new: Dict[str, List[Utxo]],
         new = {}
     
     notifs: List[BaseNotification] = []
-    
     current_list: List[Utxo] = []
     new_list: List[Utxo] = []
     
@@ -46,9 +42,13 @@ def _diff_utxos_list(current: Dict[str, List[Utxo]], new: Dict[str, List[Utxo]],
     return notifs
 
 class NotificationsService():
-    def __init__(self, wallet_svc: WalletService):
-        self._wallet_svc = wallet_svc
+    def __init__(self, wallet_svc: WalletService, locker: Locker, explorerURL: str) -> None:
+        self._session = wallet_svc._gdkAPI.session
+        self._gdk_api = wallet_svc._gdkAPI
         self._started = False
+        self._wallet_svc = wallet_svc
+        self._locker_svc = locker
+        self._explorerURL = explorerURL
         
         self.queue = asyncio.Queue()
         
@@ -58,16 +58,14 @@ class NotificationsService():
 
         # init the state
         try:
-            wallet = self._wallet_svc.get_wallet() 
-            self._utxos_by_account = _get_utxos_by_account(wallet)
+            self._utxos_by_account = _get_utxos_by_account(self._gdk_api)
         except:
             self._utxos_by_account = {}    
-    
+        
     def _get_last_block_height(self) -> int:
         """return the last block height"""
-        wallet = self._wallet_svc.get_wallet()
         while True:
-            notification = wallet.session.notifications.get(block=True, timeout=None)
+            notification = self._session.notifications.get(block=True, timeout=None)
             if notification['event'] == 'block':
                 return notification['block']['block_height']
     
@@ -82,9 +80,7 @@ class NotificationsService():
         await self.queue.put(notification)
     
     async def _put_utxos_notifications(self) -> None:
-        wallet = self._wallet_svc.get_wallet()
-        new_utxos_by_account = _get_utxos_by_account(wallet)
-        
+        new_utxos_by_account = _get_utxos_by_account(self._gdk_api)
         for account_name in self._utxos_check_accounts:
             utxos_notifications = _diff_utxos_list(self._utxos_by_account.get(account_name), new_utxos_by_account.get(account_name), account_name)
             for notification in utxos_notifications:
@@ -93,40 +89,38 @@ class NotificationsService():
         self._utxos_by_account = new_utxos_by_account
     
     async def _put_confirmed_txs_notifications(self) -> None:
-        wallet = self._wallet_svc.get_wallet()
         notifications: List[TxConfirmedNotification] = []
-        
-        for account_name in list(wallet.accounts.keys()):
+        last_block_heigth = self._get_chain_tip()
+        for account in self._gdk_api.get_accounts():
             try:
-                account = wallet.get_account(account_name)
-                txs_for_height = account.get_transactions(self._get_chain_tip())
-                notifications = notifications + [TxConfirmedNotification(tx['txhash'], wallet.get_block_details(tx['txhash']), account_name) for tx in txs_for_height] 
+                txs_for_height = account.transactions(last_block_heigth)
+                notifications = notifications + [TxConfirmedNotification(tx['txhash'], get_block_details(self._explorerURL, tx['txhash'])) for tx in txs_for_height] 
             except Exception as e:
                 logging.exception(e)
                 continue
 
         for notif in notifications:
-            if notif.block_details.block_height > self._get_chain_tip():
+            if notif.block_details.block_height > last_block_heigth:
                 self._chaintip = notif.block_details.block_height
                 
             await self._put_in_queue(notif)
 
     
-    async def _wait_for_wallet(self) -> GdkWallet:
+    async def _wait_for_wallet(self):
         """this let to wait for the wallet is ready (either unlocked or created if not exist)"""
-        wallet = None
-        while wallet is None:
+        while True:
             try:
-                wallet = self._wallet_svc.get_wallet()
+                if self._wallet_svc.is_logged():
+                    return
+                raise 'wallet not logged'
             except:
                 await asyncio.sleep(2)
-        return wallet
 
     async def _handle_gdk_notifications(self) -> None:
         """async worker waiting for new GDK block notification and then process Ocean notifications
         returns TX_CONFIRMED, UTXO_SPENT, UTXO_UNSPECIFIED (add) via the queue argument"""
         
-        # every 30 seconds, try to get new notifications from wallet state
+        # every 30 seconds, try to get new notifications from wallet state
         while self._started:
             await asyncio.gather(
                 self._put_utxos_notifications(), 
@@ -135,8 +129,7 @@ class NotificationsService():
             await asyncio.sleep(30)
         
     async def _handle_locker_notifications(self) -> None:
-        wallet = self._wallet_svc.get_wallet()
-        locker_notifications_queue = wallet.locker.notifications_queue
+        locker_notifications_queue = self._locker_svc.notifications_queue
         while True:
             n = await locker_notifications_queue.get()
             await self._put_in_queue(n)
@@ -148,13 +141,22 @@ class NotificationsService():
     def add_utxos_check_account(self, account_name: str) -> None:
         self._utxos_check_accounts.add(account_name)
     
+    def add_all_accounts(self) -> List[str]:
+        accounts = [a.name for a in self._gdk_api.get_accounts()]
+        for account in accounts:
+            self._utxos_check_accounts.add(account.name)
+        return 
+    
     def remove_utxos_check_account(self, account_name: str) -> None:
         self._utxos_check_accounts.remove(account_name)
     
+    def remove_all_accounts(self) -> None:
+        self._utxos_check_accounts.clear()
+
     async def start(self) -> None:
         self._check_not_started()
 
-        # wait for the wallet to be ready (either unlocked or created if not exist)
+        # wait for the wallet to be ready (either unlocked or created if not exist)
         await self._wait_for_wallet()
         self._started = True
         

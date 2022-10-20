@@ -1,40 +1,47 @@
 import logging
-from domain.gdk_wallet import GdkWallet
 import greenaddress as gdk
+from domain import GdkAPI, PinDataRepositoryInterface
 
 class WalletService:
-    def __init__(self, network: str) -> None:
-        self._network = network
-        self._wallet: GdkWallet = None
+    def __init__(self, session: gdk.Session, pin_data_repo: PinDataRepositoryInterface) -> None:
+        self._pin_data_repository = pin_data_repo
+        self._gdkAPI = GdkAPI(session)
     
-    """is_logged returns True in case of wallet is ready to be used"""
-    def _is_logged(self) -> bool:
-        if not self._wallet:
+    def is_logged(self) -> bool:
+        """is_logged returns True in case of wallet is ready to be used"""
+        if self._gdkAPI is None or self._gdkAPI.session is None:
             return False
         
-        return self._wallet.is_logged_in()
-    
-    def get_wallet(self) -> GdkWallet:
-        if not self._is_logged():
-            raise Exception('Wallet is not ready (locked or not set up)')
-        return self._wallet
-    
-    def generate_seed(self) -> str:
+        try:
+            self._gdkAPI.get_accounts()
+            return True
+        except:
+            return False
+            
+    def generate_mnemonic(self) -> str:
         return gdk.generate_mnemonic()
     
-    async def create_wallet(self, mnemonic: str, password: str) -> None:
-        if self._is_logged():
-            raise Exception('Wallet already exists') 
-    
-        self._wallet = await GdkWallet.create_new_wallet(mnemonic, password, self._network)
+    def create_wallet(self, mnemonic: str, password: str) -> None:
+        self._gdkAPI.register_user(mnemonic)
+        self._gdkAPI.login_with_mnemonic(mnemonic)
+        pin_data = self._gdkAPI.encrypt_with_pin(mnemonic, password)
+        self._pin_data_repository.write(pin_data)
 
-    async def login(self, password: str) -> None:
-        if self._is_logged():
+    def login_with_mnemonic(self, mnemonic: str) -> None:
+        if self.is_logged():
             raise Exception('Wallet is already logged in')
         
         logging.debug('logging in...')
-        self._wallet = await GdkWallet.login_with_pin(str(password), self._network)
+        self._gdkAPI.login_with_mnemonic(mnemonic)
+    
+    def login_with_pin(self, pin: str) -> None:
+        if self.is_logged():
+            raise Exception('Wallet is already logged in')
+        
+        logging.debug('logging in...')
+        pin_data = self._pin_data_repository.read()
+        self._gdkAPI.login_with_pindata(pin_data, pin)
     
     def change_password(self, password: str, newPassword: str) -> None:
-        pass
+        raise NotImplementedError
     

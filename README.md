@@ -10,12 +10,7 @@ The current version of gdk-ocean uses Python 3.9
 
 __the first time you run the program, you have to set up the virtual env with all dependencies.__
 
-Init the submodules:
-```
-git submodule update --init --recursive
-```
-
-And copy the stubs:
+Generate the protobuf ocean stubs:
 ```
 make stubs
 ```
@@ -39,11 +34,17 @@ make run
 ```
 By default, the server is running on port 50051.
 
+With Python venv, you are also able to run the tests using.
+As the integration tests are running on testnet network, you have to set up the `TESTNET_TEST_MNEMONIC` env variable with a valid mnemonic owning some testnet L-BTC and AMP test asset.
+
+```
+make test
+```
+
 ## Run gdk-ocean in a Docker container
 
 Init the submodules and copy the proto stubs:
 ```
-git submodule update --init --recursive
 make stubs
 ```
 
@@ -65,7 +66,7 @@ You can communicate with gdk-ocean using the `cli.py` script. It must be run by 
 
 In your virtual enviroment, install the CLI dependencies:
 ```bash
-pip install -r requirements_cli.txt
+make deps-cli
 ```
 
 > if you are running the server in a container or if u don't want to mix CLI & server env, you can create venv with: `python3.9 -m venv venv_cli`
