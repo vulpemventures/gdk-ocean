@@ -178,15 +178,20 @@ class TransactionService:
             raise Exception("No inputs to sign")
     
         blinding_nonces = []
-        
-        for out_index in range(outputs_len):
-            if wally.psbt_get_output_script_len(psbt, out_index) == 0 or wally.psbt_get_output_ecdh_public_key_len(psbt, out_index) == 0 or wally.psbt_get_output_blinding_public_key_len(psbt, out_index) == 0:
-                blinding_nonces.append('')
-                continue
-            psbt_id = wally.psbt_get_id(psbt, 0)
+        have_ephemeral_key = True
+        psbt_id = wally.psbt_get_id(psbt, 0)
+        try:
             ephemeral_keys = self._ephemeral_priv_keys[hexlify(psbt_id)]
-            nonce = get_blinding_nonce(psbt, ephemeral_keys, out_index)
-            blinding_nonces.append(wally.hex_from_bytes(nonce))
+        except KeyError:
+            have_ephemeral_key = False
+        
+        if have_ephemeral_key:
+            for out_index in range(outputs_len):
+                if wally.psbt_get_output_script_len(psbt, out_index) == 0 or wally.psbt_get_output_ecdh_public_key_len(psbt, out_index) == 0 or wally.psbt_get_output_blinding_public_key_len(psbt, out_index) == 0:
+                    blinding_nonces.append('')
+                    continue
+                nonce = get_blinding_nonce(psbt, ephemeral_keys, out_index)
+                blinding_nonces.append(wally.hex_from_bytes(nonce))
     
         utxos_arr = [u[1].gdk_utxo for u in utxos_to_sign]
         signed_result = self._gdk_api.sign_pset(psetBase64, utxos_arr, blinding_nonces)   
